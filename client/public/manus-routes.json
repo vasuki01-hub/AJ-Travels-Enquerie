@@ -1,0 +1,6 @@
+{
+  "routes": [
+    { "path": "/", "title": "AJ Tours & Travel Portal" },
+    { "path": "/admin", "title": "AJ Tours & Travel Admin" }
+  ]
+}

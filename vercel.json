@@ -1,0 +1,11 @@
+{
+  "installCommand": "echo \"No install needed for static portal\"",
+  "buildCommand": "node scripts/prepare-vercel.mjs",
+  "outputDirectory": "dist/public",
+  "framework": null,
+  "rewrites": [
+    { "source": "/admin", "destination": "/index.html" },
+    { "source": "/admin/", "destination": "/index.html" },
+    { "source": "/((?!.*\\.).*)", "destination": "/index.html" }
+  ]
+}
