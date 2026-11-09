@@ -12,6 +12,15 @@
   <link rel="apple-touch-icon" href="/aj-mark-192.png">
   <link rel="icon" href="/aj-mark.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/aj-mark.svg">
+  <script>
+    (function () {
+      var inClient = /\/client\/(?:index\.html)?$/i.test(location.pathname);
+      var base = inClient ? '/client/public' : '';
+      document.querySelectorAll('link[href^="/"]').forEach(function (el) {
+        el.href = base + el.getAttribute('href');
+      });
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
@@ -33,6 +42,7 @@
   (()=>{
     'use strict';
     const firebaseConfig={apiKey:"AIzaSyDPqFG7ssGq1ko4fo_Z7X0E5iNf2itDGUA",authDomain:"aj-travels-7ae50.firebaseapp.com",databaseURL:"https://aj-travels-7ae50-default-rtdb.firebaseio.com",projectId:"aj-travels-7ae50",storageBucket:"aj-travels-7ae50.firebasestorage.app",messagingSenderId:"90484382183",appId:"1:90484382183:web:bf499841b2c27b815dc542",measurementId:"G-4XDB27Y4CZ"};
+    const FIRESTORE_DATABASE_IDS=['default','(default)'];
     const OWNER_EMAILS=['pgboss07@gmail.com'];
     const DEFAULT_SETTINGS={agencyName:"AJ Tours & Travel",logoUrl:"",currency:"GBP",accentColor:"#1677e8",modules:{dashboard:true,enquiries:true,bookings:true,reports:true},customFields:[]};
     const STATUS={enquiry:["new","contacted","quoted","follow-up","converted","lost"],booking:["confirmed","ticketed","completed","cancelled"]};
@@ -63,7 +73,7 @@
     function statusClass(s){return 'status-'+String(s||'').replace(/[^a-z-]/g,'');}
     function paymentLabel(s){return ({pending:'Pending',partially_paid:'Partially paid',paid:'Paid'})[s]||'Pending';}
     function showToast(text,error=false){const el=document.createElement('div');el.className='toast'+(error?' error':'');el.textContent=text;document.getElementById('toastRegion').appendChild(el);setTimeout(()=>el.remove(),3600);}
-    function friendlyError(err){const c=err&&err.code||'';return ({'auth/email-already-in-use':'This email already has an account. Try signing in.','auth/invalid-email':'Enter a valid email address.','auth/weak-password':'Choose a stronger password (at least 8 characters).','auth/user-not-found':'The email or password is not correct.','auth/wrong-password':'The email or password is not correct.','auth/invalid-credential':'The email or password is not correct.','auth/operation-not-allowed':'Enable Email/Password in Firebase Authentication settings.','auth/network-request-failed':'The network connection was lost. Check your internet.','permission-denied':'Firebase denied this action. Check that Firestore is created and the latest firestore.rules are deployed.','unavailable':'Firebase is temporarily unavailable. Check your connection.'})[c]||String(err&&err.message||'Something went wrong. Please try again.').replace(/\(firestore\/[^)]+\)/g,'');}
+    function friendlyError(err){const c=err&&err.code||'';const msg=String(err&&err.message||'');if(/database '\(default\)' not found/i.test(msg)||/database \(default\) does not exist/i.test(msg)||/does not exist for project/i.test(msg))return 'Firestore database (default) was not found. In Firebase Console → Firestore, look at the database ID in the top dropdown. If it is not (default), click Create database and choose the default database, or use the existing ID named default.';if(c==='unavailable'&&/not found/i.test(msg))return 'Could not reach the Firestore (default) database. Confirm the database exists in project aj-travels-7ae50 and turn off any ad blocker for this site.';return ({'auth/email-already-in-use':'This email already has an account. Try signing in.','auth/invalid-email':'Enter a valid email address.','auth/weak-password':'Choose a stronger password (at least 8 characters).','auth/user-not-found':'The email or password is not correct.','auth/wrong-password':'The email or password is not correct.','auth/invalid-credential':'The email or password is not correct.','auth/operation-not-allowed':'Enable Email/Password in Firebase Authentication settings.','auth/network-request-failed':'The network connection was lost. Check your internet.','permission-denied':'Firebase denied this action. Check that Firestore is created and the latest firestore.rules are deployed.','unavailable':'Firebase could not reach Firestore. Turn off ad blockers for this site, then confirm Firestore exists in project aj-travels-7ae50.'})[c]||msg.replace(/\(firestore\/[^)]+\)/g,'')||'Something went wrong. Please try again.';}
     function svgLogo(size=''){const url=String(state.settings.logoUrl||'');if(/^https:\/\//i.test(url))return `<img class="brand-mark ${size}" src="${h(url)}" alt="">`;return `<span class="brand-mark brand-fallback ${size}">AJ</span>`;}
     function isAdminPortal(){const path=(location.pathname||'/').replace(/\/+$/,'')||'/';return path==='/admin'||path.endsWith('/admin')||(location.hash||'').includes('admin');}
     function goPortal(kind){if(kind==='admin'){history.pushState({},'', '/admin');}else{history.pushState({},'', '/');}state.view='dashboard';state.mobileOpen=false;render();}
@@ -196,9 +206,12 @@
     window.addEventListener('online',()=>render());
     window.addEventListener('offline',()=>render());
     window.addEventListener('popstate',()=>render());
-    if('serviceWorker'in navigator&&/^https?:$/.test(location.protocol))navigator.serviceWorker.register('/service-worker.js').catch(()=>{});
+    function firestoreInstance(databaseId){const app=firebase.app();try{if(typeof firebase.firestore==='function'&&firebase.firestore.length>=2){const named=firebase.firestore(app,databaseId);if(named)return named;}}catch{}try{const provider=app.container&&app.container.getProvider&&app.container.getProvider('firestore-compat');if(provider)return provider.getImmediate({identifier:databaseId});}catch{}try{const provider=app.container&&app.container.getProvider&&app.container.getProvider('firestore');if(provider){const exp=provider.getImmediate({identifier:databaseId});if(exp&&firebase.firestore&&firebase.firestore.Firestore)return new firebase.firestore.Firestore(app,exp);return exp;}}catch{}if(!databaseId||databaseId==='(default)')return firebase.firestore();return null;}
+    function openFirestore(){for(const id of FIRESTORE_DATABASE_IDS){const instance=firestoreInstance(id);if(instance){try{instance.settings({ignoreUndefinedProperties:true,experimentalAutoDetectLongPolling:true});}catch{}return instance;}}return firebase.firestore();}
+    const onLocalStatic=/^https?:$/.test(location.protocol)&&(/:5500$/.test(location.host)||/\/client\//.test(location.pathname));
+    if('serviceWorker'in navigator&&/^https?:$/.test(location.protocol)&&!onLocalStatic)navigator.serviceWorker.register('/service-worker.js').catch(()=>{});
     if(!appConfigAvailable){render();return;}
-    try{firebase.initializeApp(firebaseConfig);auth=firebase.auth();db=firebase.firestore();auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(()=>{});auth.onAuthStateChanged(user=>{state.user=user;if(!user){stopListeners();state.profile=null;state.screen='auth';state.syncError='';render();return;}activateSession(user);});}catch(err){state.screen='auth';state.authError=friendlyError(err);render();}
+    try{firebase.initializeApp(firebaseConfig);auth=firebase.auth();db=openFirestore();auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(()=>{});auth.onAuthStateChanged(user=>{state.user=user;if(!user){stopListeners();state.profile=null;state.screen='auth';state.syncError='';render();return;}activateSession(user);});}catch(err){state.screen='auth';state.authError=friendlyError(err);render();}
   })();
   </script>
   <style>.svg-icon{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}.svg-icon svg{display:block;width:17px;height:17px}.brand-mark.small{width:42px;height:42px;margin:0 auto}.att-actions{display:flex;flex-wrap:wrap;gap:8px}.admin-portal .sidebar{background:#10233c}.admin-portal .sidebar,.admin-portal .nav-button,.admin-portal .side-label,.admin-portal .sidebar-brand strong,.admin-portal .user-copy strong{color:#e8eef7}.admin-portal .sidebar-brand small,.admin-portal .user-copy small,.admin-portal .sidebar-tip p{color:#9eb0c7}.admin-portal .nav-button:hover{background:#1b3554;color:#fff}.admin-portal .nav-button.active{background:#1677e8;color:#fff}.admin-portal .sidebar-tip{background:#163152;border-color:#24476d}.admin-portal .user-box{border-top-color:#24476d}.status-present,.status-paid_leave,.status-festival_leave{background:#e7f7f2;color:#16836e}.status-unpaid_leave,.status-absent{background:#fff0ee;color:#bb6258}.status-sick_leave,.status-half_day{background:#fff4df;color:#a36c18}.pending-card code{font-size:12px}.record-table .svg-icon{vertical-align:middle}.pending-card .brand-mark{margin:3px auto 0}.chart-box .chart-label{font-size:12px}@media(max-width:760px){.auth-story{min-height:220px}.form-section{min-width:0}.report-export .table-actions{width:100%}.field input,.field select,.field textarea{font-size:16px}.button{min-height:42px}.table-scroll{width:100%}.chart-box{height:190px}}</style>
