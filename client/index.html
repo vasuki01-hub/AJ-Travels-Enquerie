@@ -42,7 +42,7 @@
   (()=>{
     'use strict';
     const firebaseConfig={apiKey:"AIzaSyDPqFG7ssGq1ko4fo_Z7X0E5iNf2itDGUA",authDomain:"aj-travels-7ae50.firebaseapp.com",databaseURL:"https://aj-travels-7ae50-default-rtdb.firebaseio.com",projectId:"aj-travels-7ae50",storageBucket:"aj-travels-7ae50.firebasestorage.app",messagingSenderId:"90484382183",appId:"1:90484382183:web:bf499841b2c27b815dc542",measurementId:"G-4XDB27Y4CZ"};
-    const FIRESTORE_DATABASE_IDS=['default','(default)'];
+    const FIRESTORE_DATABASE_ID='default';
     const OWNER_EMAILS=['pgboss07@gmail.com'];
     const DEFAULT_SETTINGS={agencyName:"AJ Tours & Travel",logoUrl:"",currency:"GBP",accentColor:"#1677e8",modules:{dashboard:true,enquiries:true,bookings:true,reports:true},customFields:[]};
     const STATUS={enquiry:["new","contacted","quoted","follow-up","converted","lost"],booking:["confirmed","ticketed","completed","cancelled"]};
@@ -206,8 +206,7 @@
     window.addEventListener('online',()=>render());
     window.addEventListener('offline',()=>render());
     window.addEventListener('popstate',()=>render());
-    function firestoreInstance(databaseId){const app=firebase.app();try{if(typeof firebase.firestore==='function'&&firebase.firestore.length>=2){const named=firebase.firestore(app,databaseId);if(named)return named;}}catch{}try{const provider=app.container&&app.container.getProvider&&app.container.getProvider('firestore-compat');if(provider)return provider.getImmediate({identifier:databaseId});}catch{}try{const provider=app.container&&app.container.getProvider&&app.container.getProvider('firestore');if(provider){const exp=provider.getImmediate({identifier:databaseId});if(exp&&firebase.firestore&&firebase.firestore.Firestore)return new firebase.firestore.Firestore(app,exp);return exp;}}catch{}if(!databaseId||databaseId==='(default)')return firebase.firestore();return null;}
-    function openFirestore(){for(const id of FIRESTORE_DATABASE_IDS){const instance=firestoreInstance(id);if(instance){try{instance.settings({ignoreUndefinedProperties:true,experimentalAutoDetectLongPolling:true});}catch{}return instance;}}return firebase.firestore();}
+    function openFirestore(){const app=firebase.app();const ids=[FIRESTORE_DATABASE_ID,'default','(default)'].filter((id,i,all)=>id&&all.indexOf(id)===i);for(const id of ids){try{if(typeof app._getService==='function'){const inst=app._getService('firestore-compat',id);if(inst)return inst;}}catch{}try{const provider=app.container&&app.container.getProvider&&app.container.getProvider('firestore-compat');if(provider){const inst=provider.getImmediate({identifier:id});if(inst)return inst;}}catch{}try{const provider=app.container&&app.container.getProvider&&app.container.getProvider('firestore');if(provider){const exp=provider.getImmediate({identifier:id});if(exp){if(firebase.firestore&&firebase.firestore.Firestore)return new firebase.firestore.Firestore(app,exp);return exp;}}}catch{}}return firebase.firestore();}
     const onLocalStatic=/^https?:$/.test(location.protocol)&&(/:5500$/.test(location.host)||/\/client\//.test(location.pathname));
     if('serviceWorker'in navigator&&/^https?:$/.test(location.protocol)&&!onLocalStatic)navigator.serviceWorker.register('/service-worker.js').catch(()=>{});
     if(!appConfigAvailable){render();return;}
