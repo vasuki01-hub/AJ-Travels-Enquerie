@@ -1,0 +1,1 @@
+ALTER TABLE `travel_records` ADD `enquiryDate` date;
