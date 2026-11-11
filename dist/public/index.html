@@ -1379,123 +1379,44 @@
             color: var(--muted-foreground)
         }
     
-        /* === PRODUCTION-READY ENHANCEMENTS === */
+        /* === PRODUCTION ENHANCEMENTS === */
         .permanent-uid-badge {
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            padding: 4px 10px;
+            padding: 3px 8px;
             background: var(--muted);
             border: 1px solid var(--border);
             border-radius: 6px;
             font-family: monospace;
             font-size: 13px;
             font-weight: 700;
-            color: var(--foreground);
         }
         .rank-badge {
             display: inline-flex;
             align-items: center;
             gap: 4px;
-            padding: 3px 8px;
+            padding: 2px 8px;
             border-radius: 999px;
             font-size: 12px;
-            font-weight: 700;
+            font-weight: 600;
             background: var(--secondary);
             color: var(--secondary-foreground);
         }
-        .workflow-pipeline {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 12px 14px;
-            background: var(--muted);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            margin-bottom: 16px;
-            overflow-x: auto;
-        }
-        .pipeline-step {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--muted-foreground);
-            background: var(--card);
-            border: 1px solid var(--border);
-            cursor: pointer;
-            transition: all .15s ease;
-            white-space: nowrap;
-        }
-        .pipeline-step:hover {
-            border-color: var(--primary);
-            color: var(--primary);
-        }
-        .pipeline-step.active {
-            background: var(--primary);
-            color: var(--primary-foreground);
-            border-color: var(--primary);
-        }
-        .pipeline-step.lost {
-            border-color: var(--destructive);
-            color: var(--destructive);
-        }
-        .pipeline-step.lost.active {
-            background: var(--destructive);
-            color: var(--destructive-foreground);
-        }
-        .reminder-widget {
-            padding: 18px 20px;
-            border-radius: 12px;
-            background: var(--card);
-            border: 1px solid var(--border);
-            margin-bottom: 20px;
-        }
-        .reminder-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            padding: 3px 8px;
-            border-radius: 999px;
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
-        }
-        .reminder-badge.overdue {
-            background: hsl(0, 84%, 95%);
-            color: hsl(0, 72%, 45%);
-            border: 1px solid hsl(0, 72%, 85%);
-        }
-        .reminder-badge.due-today {
-            background: hsl(38, 92%, 95%);
-            color: hsl(38, 92%, 40%);
-            border: 1px solid hsl(38, 92%, 80%);
-        }
-        .reminder-badge.upcoming {
-            background: hsl(142, 76%, 95%);
-            color: hsl(142, 76%, 30%);
-            border: 1px solid hsl(142, 76%, 80%);
-        }
         .duplicate-warning {
-            display: flex;
-            align-items: flex-start;
-            gap: 10px;
-            padding: 12px 14px;
+            padding: 10px 14px;
             background: hsl(38, 92%, 95%);
             border: 1px solid hsl(38, 92%, 80%);
-            border-radius: 8px;
+            border-radius: 6px;
             color: hsl(38, 92%, 30%);
             font-size: 13px;
             font-weight: 600;
-            margin-bottom: 14px;
+            margin-bottom: 12px;
         }
         .audit-badge {
             display: inline-flex;
             align-items: center;
-            padding: 2px 7px;
+            padding: 2px 6px;
             border-radius: 4px;
             font-size: 11px;
             font-weight: 700;
@@ -3325,7 +3246,7 @@
                                     <input type="text" id="curSearchInput" class="form-input" placeholder="e.g. USD, Pound, Rupee, Japan..." oninput="Currency.filterModalGrid(this.value)">
                                 </div>
                             </div>
-                            <div id="curModalGrid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));gap:8px;max-height:420px;overflow-y:auto;padding:4px">
+                            <div id="curModalGrid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(210px, 1fr));gap:8px;max-height:400px;overflow-y:auto;padding:4px">
                                 ${this.renderGridItems(this.OPTIONS, current)}
                             </div>
                         </div>
@@ -3478,7 +3399,7 @@
                     item.reassignedAt = new Date().toISOString();
                     await FirestoreSync.saveDoc(col, recordId, item);
                     await Audit.log('reassign_' + type, recordId, { to: newEmpName, toId: newEmpId });
-                    Utils.showToast('Reassigned', `Record successfully transferred to ${newEmpName}`);
+                    Utils.showToast('Reassigned', `Record transferred to ${newEmpName}`);
                 }
             },
 
@@ -3999,19 +3920,19 @@
                     </div>
                     <nav class="sidebar-nav">
                         ${u.role === 'admin' ? `
-                            <button class="nav-item" data-page="dashboard">📊 Admin Dashboard</button>
-                            <button class="nav-item" data-page="inquiries">📋 All Inquiries</button>
-                            <button class="nav-item" data-page="my-bookings">🎫 All Bookings</button>
-                            <button class="nav-item" data-page="employees">👥 Employee Management</button>
-                            <button class="nav-item" data-page="audit-logs">📜 Activity Log</button>
-                            <button class="nav-item" data-page="reports">📈 Reports &amp; Matrix</button>
+                            <button class="nav-item" data-page="dashboard">Dashboard</button>
+                            <button class="nav-item" data-page="inquiries">Inquiries</button>
+                            <button class="nav-item" data-page="my-bookings">Bookings</button>
+                            <button class="nav-item" data-page="employees">Employees</button>
+                            <button class="nav-item" data-page="audit-logs">Activity Log</button>
+                            <button class="nav-item" data-page="reports">Reports</button>
                             <button class="nav-item" data-page="settings">⚙ Settings</button>
                         ` : `
-                            <button class="nav-item" data-page="dashboard">📊 Personal Dashboard</button>
-                            <button class="nav-item" data-page="my-bookings">🎫 My Bookings</button>
-                            <button class="nav-item" data-page="inquiries">📋 My Inquiries</button>
-                            <button class="nav-item" data-page="details">✈ Trip Details</button>
-                            <button class="nav-item" data-page="reports">📈 My Reports</button>
+                            <button class="nav-item" data-page="dashboard">Dashboard</button>
+                            <button class="nav-item" data-page="my-bookings">My Bookings</button>
+                            <button class="nav-item" data-page="inquiries">Inquiries</button>
+                            <button class="nav-item" data-page="details">Details</button>
+                            <button class="nav-item" data-page="reports">Reports</button>
                             <button class="nav-item" data-page="settings">⚙ Settings</button>
                         `}
                     </nav>
@@ -4082,55 +4003,54 @@
 
                 const content = `
             <div class="space-y-6">
-                <!-- FOLLOW-UP REMINDERS WIDGET -->
-                <div class="reminder-widget">
-                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-                        <div>
-                            <strong style="font-size:16px;display:flex;align-items:center;gap:6px">🔔 Follow-up Reminders</strong>
-                            <small class="text-muted">Stay connected with clients scheduled for follow-up</small>
-                        </div>
-                        <div style="display:flex;gap:6px">
-                            <span class="reminder-badge overdue">${overdue.length} Overdue</span>
-                            <span class="reminder-badge due-today">${dueToday.length} Due Today</span>
-                            <span class="reminder-badge upcoming">${upcomingFollow.length} Upcoming</span>
-                        </div>
-                    </div>
-                    ${overdue.length === 0 && dueToday.length === 0 && upcomingFollow.length === 0 ? `
-                        <div style="padding:14px 0;text-align:center;color:var(--muted-foreground);font-size:13px">
-                            No follow-up reminders pending right now. Great job!
-                        </div>
-                    ` : `
-                        <div style="display:flex;flex-direction:column;gap:8px">
-                            ${[...overdue, ...dueToday, ...upcomingFollow].slice(0, 5).map(i => {
-                                const isO = i.followUpDate < todayStr;
-                                const isT = i.followUpDate === todayStr;
-                                return `
-                                    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 12px;background:var(--muted);border-radius:8px;font-size:13px">
-                                        <div>
-                                            <strong>${Utils.escapeHtml(i.name || i.clientName || 'Client')}</strong>
-                                            <span class="text-muted" style="margin:0 6px">·</span>
-                                            <span>${Utils.escapeHtml(i.dest || i.destination || 'Trip')}</span>
-                                            ${(i.phone || i.contactNumber) ? `<span class="text-muted" style="margin:0 6px">·</span><span>${Utils.escapeHtml(i.phone || i.contactNumber)}</span>` : ''}
-                                        </div>
-                                        <div style="display:flex;align-items:center;gap:8px">
-                                            <span class="reminder-badge ${isO ? 'overdue' : isT ? 'due-today' : 'upcoming'}">
-                                                ${isO ? 'Overdue: ' : isT ? 'Today: ' : 'Due: '}${i.followUpDate}
-                                            </span>
-                                            <button class="btn btn-sm btn-outline" onclick="Inquiries.edit('${i.id}')">Open</button>
-                                        </div>
-                                    </div>
-                                `;
-                            }).join('')}
-                        </div>
-                    `}
+                <div class="grid grid-cols-4 gap-4">
+                    <div class="card metric-card"><div class="metric-card-header"><div class="metric-card-title">Total Bookings</div></div><div class="metric-value" style="color:var(--primary)">${bks.length}</div><div class="metric-label">This month</div></div>
+                    <div class="card metric-card"><div class="metric-card-header"><div class="metric-card-title">Successful</div></div><div class="metric-value" style="color:var(--success)">${succ}</div><div class="metric-label">Inquiries closed</div></div>
+                    <div class="card metric-card"><div class="metric-card-header"><div class="metric-card-title">Under Process</div></div><div class="metric-value" style="color:var(--warning)">${proc}</div><div class="metric-label">Active inquiries</div></div>
+                    <div class="card metric-card"><div class="metric-card-header"><div class="metric-card-title">Upcoming</div></div><div class="metric-value">${upcoming}</div><div class="metric-label">Departures</div></div>
                 </div>
 
-                <!-- METRICS GRID -->
-                <div class="grid grid-cols-4 gap-4">
-                    <div class="card metric-card"><div class="metric-card-header"><div class="metric-card-title">${u.role === 'admin' ? 'Total Inquiries' : 'My Inquiries'}</div></div><div class="metric-value" style="color:var(--primary)">${inqs.length}</div><div class="metric-label">Inquiry volume</div></div>
-                    <div class="card metric-card"><div class="metric-card-header"><div class="metric-card-title">Successful</div></div><div class="metric-value" style="color:var(--success)">${succ}</div><div class="metric-label">Won bookings</div></div>
-                    <div class="card metric-card"><div class="metric-card-header"><div class="metric-card-title">Follow-ups Due</div></div><div class="metric-value" style="color:var(--warning)">${overdue.length + dueToday.length}</div><div class="metric-label">Action required</div></div>
-                    <div class="card metric-card"><div class="metric-card-header"><div class="metric-card-title">Conversion</div></div><div class="metric-value" style="color:var(--accent)">${convRate}%</div><div class="metric-label">Personal rate</div></div>
+                <!-- FOLLOW-UP REMINDERS WIDGET -->
+                <div class="card">
+                    <div class="card-header card-header-flex">
+                        <div>
+                            <div class="card-title">Follow-up Reminders</div>
+                            <div class="card-description">Clients scheduled for follow-up</div>
+                        </div>
+                        <div style="display:flex;gap:6px">
+                            <span class="badge ${overdue.length > 0 ? 'badge-danger' : ''}">${overdue.length} Overdue</span>
+                            <span class="badge ${dueToday.length > 0 ? 'badge-warning' : ''}">${dueToday.length} Due Today</span>
+                            <span class="badge">${upcomingFollow.length} Upcoming</span>
+                        </div>
+                    </div>
+                    <div class="card-content">
+                        ${overdue.length === 0 && dueToday.length === 0 && upcomingFollow.length === 0 ? `
+                            <p class="text-muted text-center py-2" style="font-size:13px">No follow-ups scheduled.</p>
+                        ` : `
+                            <div style="display:flex;flex-direction:column;gap:8px">
+                                ${[...overdue, ...dueToday, ...upcomingFollow].slice(0, 5).map(i => {
+                                    const isO = i.followUpDate < todayStr;
+                                    const isT = i.followUpDate === todayStr;
+                                    return `
+                                        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 12px;background:var(--muted);border-radius:6px;font-size:13px">
+                                            <div>
+                                                <strong>${Utils.escapeHtml(i.name || i.clientName || 'Client')}</strong>
+                                                <span class="text-muted" style="margin:0 6px">·</span>
+                                                <span>${Utils.escapeHtml(i.dest || i.destination || 'Trip')}</span>
+                                                ${(i.phone || i.contactNumber) ? `<span class="text-muted" style="margin:0 6px">·</span><span>${Utils.escapeHtml(i.phone || i.contactNumber)}</span>` : ''}
+                                            </div>
+                                            <div style="display:flex;align-items:center;gap:8px">
+                                                <span class="badge ${isO ? 'badge-danger' : isT ? 'badge-warning' : ''}">
+                                                    ${isO ? 'Overdue: ' : isT ? 'Today: ' : 'Due: '}${i.followUpDate}
+                                                </span>
+                                                <button class="btn btn-sm btn-outline" onclick="Inquiries.edit('${i.id}')">Open</button>
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        `}
+                    </div>
                 </div>
 
                 <div class="card"><div class="card-header"><div class="card-title">Quick Actions</div></div>
@@ -4264,7 +4184,7 @@
         <td>${Utils.escapeHtml(Utils.formatPaymentDisplay(b))}</td><td>${Utils.escapeHtml(b.bookingDetails || '—')}</td>
         <td onclick="event.stopPropagation()"><div class="row-actions">
             <button class="btn btn-ghost btn-sm icon-btn" title="Edit" onclick="MyBookings.edit('${b.id}')">✎</button>
-            ${u.role === 'admin' ? `<button class="btn btn-ghost btn-sm" onclick="Inquiries.showReassignModal('booking', '${b.id}')" title="Reassign Staff">Reassign</button>` : ''}
+            ${Auth.getUser()?.role === 'admin' ? `<button class="btn btn-ghost btn-sm" onclick="Inquiries.showReassignModal('booking', '${b.id}')" title="Reassign Staff">Reassign</button>` : ''}
             <button class="btn btn-ghost btn-sm icon-btn" title="Delete" style="color:var(--destructive)" onclick="MyBookings.del('${b.id}')">🗑</button>
         </div></td></tr>`;
                 }).join('');
@@ -4525,7 +4445,7 @@
                 <button class="btn btn-ghost btn-sm" onclick="Inquiries.status('${i.id}','Under Process')">Process</button>
                 <button class="btn btn-ghost btn-sm" onclick="Inquiries.status('${i.id}','Successful')">Success</button>
                 <button class="btn btn-ghost btn-sm" onclick="Inquiries.status('${i.id}','Unsuccessful')">Fail</button>
-                ${u.role === 'admin' ? `<button class="btn btn-ghost btn-sm" onclick="Inquiries.showReassignModal('inquiry', '${i.id}')" title="Reassign Staff">Reassign</button>` : ''}
+                ${Auth.getUser()?.role === 'admin' ? `<button class="btn btn-ghost btn-sm" onclick="Inquiries.showReassignModal('inquiry', '${i.id}')" title="Reassign Staff">Reassign</button>` : ''}
                 <button class="btn btn-ghost btn-sm" style="color:var(--destructive)" onclick="Inquiries.del('${i.id}')">Del</button>
             </td>
         </tr>`;
@@ -4961,7 +4881,7 @@
                 const employees = Storage.getEmployees();
                 const allInqs = Storage.getAllInquiriesRaw();
                 const allBks = Storage.getAllBookingsRaw();
-                if (!employees.length) return '<p class="text-muted">No employees registered yet.</p>';
+                if (!employees.length) return '';
 
                 return `
                     <div class="card" style="margin-top:20px">
@@ -5035,7 +4955,7 @@
                     <div class="card"><div class="card-content text-center"><div class="text-3xl font-bold text-var(--accent)" id="totalRev">$0</div><div>Total Sales Revenue</div></div></div>
                 </div></div>`;
                 if (Auth.getUser()?.role === 'admin') { content += Reports.renderStaffMatrix(); }
-                return Layout.render('Reports & Analytics', content);
+                return Layout.render('Reports', content);
             },
             change(type, val) { this[type] = val; this.update(); },
             update() {
@@ -5263,16 +5183,16 @@
                                 <button class="btn btn-outline btn-sm" onclick="Settings.showEditProfileModal()">Edit Profile</button>
                             </div>
                             <div class="info-grid">
-                                <div><strong>Employee Name</strong><br>${Utils.escapeHtml(u?.name || '—')}</div>
+                                <div><strong>Name</strong><br>${Utils.escapeHtml(u?.name || '—')}</div>
                                 <div><strong>Rank / Title</strong><br><span class="rank-badge">${Utils.escapeHtml(u?.rank || (u?.role === 'admin' ? 'Managing Director' : 'Travel Consultant'))}</span></div>
                                 <div><strong>Permanent UID</strong><br><span class="permanent-uid-badge">🔒 ${Utils.escapeHtml(u?.uid || ('AJ-EMP-' + (u?.id || '').slice(0, 8).toUpperCase()))}</span></div>
-                                <div><strong>Email Address</strong><br>${Utils.escapeHtml(u?.email || '—')}</div>
+                                <div><strong>Email</strong><br>${Utils.escapeHtml(u?.email || '—')}</div>
                                 <div><strong>Role</strong><br><span class="badge badge-secondary">${Utils.escapeHtml(u?.role || '—')}</span></div>
-                                <div><strong>Password</strong><br><div style="display:flex;align-items:center;gap:8px"><span style="letter-spacing:2px">••••••••••••</span><button class="btn btn-ghost btn-sm" onclick="Settings.showChangePasswordModal()">Change Password</button></div></div>
+                                <div><strong>Password</strong><br><div style="display:flex;align-items:center;gap:8px"><span style="letter-spacing:2px">••••••••••••</span><button class="btn btn-ghost btn-sm" onclick="Settings.showChangePasswordModal()">Change</button></div></div>
                             </div>
                         </div>
 
-                        <!-- 190+ CURRENCY SELECTOR -->
+                        <!-- 200+ CURRENCY SELECTOR -->
                         <div class="settings-section">
                             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
                                 <div>
@@ -5281,19 +5201,19 @@
                                 </div>
                                 <button class="btn btn-primary btn-sm" onclick="Currency.showSelectorModal()">Select Currency (200+ Countries)</button>
                             </div>
-                            <div style="display:flex;align-items:center;gap:14px;padding:14px 18px;background:var(--muted);border:1px solid var(--border);border-radius:10px">
-                                <span style="font-size:32px;line-height:1">${Currency.get().flag || '🌐'}</span>
+                            <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--muted);border-radius:8px">
+                                <span style="font-size:28px;line-height:1">${Currency.get().flag || '🌐'}</span>
                                 <div>
-                                    <strong style="font-size:16px">${Currency.get().label}</strong>
+                                    <strong>${Currency.get().label}</strong>
                                     <div class="text-muted" style="font-size:12px">Code: ${Currency.get().code} · Symbol: ${Currency.get().symbol} ${Currency.get().country ? '· ' + Currency.get().country : ''}</div>
                                 </div>
                             </div>
                         </div>
 
                         <!-- PERMANENT ACCOUNT DELETION -->
-                        <div class="settings-section" style="border:1px solid var(--destructive);padding:18px;border-radius:10px;margin-top:24px">
-                            <h3 class="settings-section-title" style="color:var(--destructive);margin-bottom:6px">Danger Zone · Permanently Delete Account</h3>
-                            <p class="text-muted" style="font-size:13px;margin-bottom:14px">Permanently delete your profile, credentials, and user data from AJ Tours &amp; Travel. This action cannot be undone.</p>
+                        <div class="settings-section" style="border:1px solid var(--destructive);padding:16px;border-radius:8px;margin-top:20px">
+                            <h3 class="settings-section-title" style="color:var(--destructive);margin-bottom:4px">Danger Zone · Permanently Delete Account</h3>
+                            <p class="text-muted" style="font-size:13px;margin-bottom:12px">Permanently remove your account, credentials, and user data. This action cannot be undone.</p>
                             <button class="btn btn-outline" style="color:var(--destructive);border-color:var(--destructive)" onclick="Settings.showDeleteAccountModal()">Permanently Delete Account</button>
                         </div>
                     </div>

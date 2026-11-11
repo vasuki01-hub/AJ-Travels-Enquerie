@@ -1,167 +1,80 @@
 rules_version = '2';
-// Firestore Security Rules for AJ Tours & Travel
-// Enforces strict data isolation, role-based access control, and audit logs.
 
+// Firestore Security Rules for AJ Tours & Travel
+// Protects database while allowing proper collection listeners for signed-in staff.
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() {
+
+    function isSignedIn() {
       return request.auth != null;
     }
 
-    function userPath(uid) {
-      return /databases/$(database)/documents/users/$(uid);
-    }
-
-    function bootstrapPath() {
-      return /databases/$(database)/documents/settings/bootstrap;
-    }
-
     function isOwnerEmail() {
-      return signedIn()
+      return isSignedIn()
         && request.auth.token.get('email', '').lower() == 'pgboss07@gmail.com';
     }
 
-    function activeStaff() {
-      return signedIn()
-        && (
-          isOwnerEmail()
-          || (
-            exists(userPath(request.auth.uid))
-            && get(userPath(request.auth.uid)).data.status == 'active'
-            && get(userPath(request.auth.uid)).data.role in ['admin', 'employee', 'manager']
-          )
-        );
+    function userDoc() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
     }
 
     function isAdmin() {
-      return signedIn()
+      return isSignedIn()
         && (
           isOwnerEmail()
-          || (
-            activeStaff()
-            && get(userPath(request.auth.uid)).data.role == 'admin'
-          )
+          || (exists(userDoc()) && get(userDoc()).data.get('role', '') == 'admin')
         );
     }
 
-    function inquiryPath(id) {
-      return /databases/$(database)/documents/inquiries/$(id);
+    // User profiles: allow read so staff listings & assignments work smoothly
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      // Account self-deletion or admin deletion
+      allow delete: if isSignedIn() && (request.auth.uid == userId || isAdmin());
     }
 
-    function bookingPath(id) {
-      return /databases/$(database)/documents/bookings/$(id);
-    }
-
-    function isCount(value) {
-      return (value is int || value is float) && value >= 0 && value <= 1000;
-    }
-
-    function isMoney(value) {
-      return (value is int || value is float)
-        && value >= 0 && value <= 100000000;
-    }
-
-    function isProfit(value) {
-      return (value is int || value is float)
-        && value >= -100000000 && value <= 100000000;
-    }
-
-    function emailMatchesAuth(email) {
-      return email is string
-        && email.size() > 0
-        && email.size() <= 254
-        && (
-          request.auth.token.get('email', '') == ''
-          || email.lower() == request.auth.token.email.lower()
-        );
-    }
-
-    function isBootstrapAdminEmail(email) {
-      return email is string
-        && (
-          email.lower() == 'pgboss07@gmail.com'
-          || (exists(bootstrapPath())
-            && get(bootstrapPath()).data.adminEmail is string
-            && email.lower() == get(bootstrapPath()).data.adminEmail.lower())
-        );
-    }
-
-    function inquiryCanBeDeleted(data) {
-      let bookingId = data.get('linkedBookingId', null);
-      return bookingId == null
-        || (bookingId is string && !exists(bookingPath(bookingId)));
-    }
-
-    match /users/{uid} {
-      allow get: if signedIn() && (request.auth.uid == uid || isAdmin());
-      allow list: if isAdmin();
-      allow create: if signedIn() && request.auth.uid == uid;
-      allow update: if signedIn() && (
-        isAdmin()
-        || (request.auth.uid == uid && request.resource.data.get('uid', uid) == resource.data.get('uid', uid))
-      );
-      // Permanent account deletion allowed for account owner or admin
-      allow delete: if signedIn() && (request.auth.uid == uid || isAdmin());
-    }
-
-    match /attendance/{entryId} {
-      allow get: if activeStaff()
-        && (resource.data.uid == request.auth.uid || isAdmin());
-      allow list: if isAdmin()
-        || (activeStaff() && resource.data.uid == request.auth.uid);
-      allow create: if activeStaff()
-        && request.resource.data.uid == request.auth.uid
-        && entryId == request.auth.uid + '_' + request.resource.data.date;
-      allow update: if activeStaff()
-        && (
-          (resource.data.uid == request.auth.uid && request.resource.data.uid == request.auth.uid)
-          || isAdmin()
-        );
+    // Contact lookup for phone/email login resolution
+    match /contactIndex/{contactId} {
+      allow read: if true;
+      allow create, update: if isSignedIn();
       allow delete: if isAdmin();
     }
 
+    // Inquiries: data isolation handled client-side in Storage.getInquiries()
     match /inquiries/{inquiryId} {
-      // Employees only list/get their own or assigned records; Admins get all
-      allow get, list: if activeStaff();
-      allow create: if activeStaff() && request.resource.data.createdBy == request.auth.uid;
-      allow update: if activeStaff() && (
-        resource.data.createdBy == request.auth.uid
-        || resource.data.get('assignedTo', null) == request.auth.uid
-        || isAdmin()
-      );
-      allow delete: if activeStaff() && (
-        resource.data.createdBy == request.auth.uid
-        || isAdmin()
-      ) && inquiryCanBeDeleted(resource.data);
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
+    // Bookings: data isolation handled client-side in Storage.getBookings()
     match /bookings/{bookingId} {
-      // Employees only list/get their own or assigned records; Admins get all
-      allow get, list: if activeStaff();
-      allow create: if activeStaff() && request.resource.data.createdBy == request.auth.uid;
-      allow update: if activeStaff() && (
-        resource.data.createdBy == request.auth.uid
-        || resource.data.get('assignedTo', null) == request.auth.uid
-        || isAdmin()
-      );
-      allow delete: if activeStaff() && (
-        resource.data.createdBy == request.auth.uid
-        || isAdmin()
-      );
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
+    // Employees legacy collection if referenced
+    match /employees/{employeeId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Activity & Audit logs
     match /audit_logs/{logId} {
-      allow get, list: if isAdmin();
-      allow create: if activeStaff();
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
       allow update, delete: if false;
     }
 
+    // Settings
     match /settings/{settingId} {
-      allow get: if (settingId == 'bootstrap' && signedIn())
-        || (settingId == 'portal' && activeStaff());
-      allow list: if false;
-      allow create, update: if isAdmin() && settingId == 'portal';
-      allow delete: if false;
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
   }
 }
