@@ -58,6 +58,37 @@ service cloud.firestore {
       allow delete: if isSignedIn();
     }
 
+    // Attendance & Shifts
+    match /attendance/{attId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Leave Requests & Approvals
+    match /leave_requests/{leaveId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Expenses
+    match /expenses/{expenseId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Calendar events & holidays
+    match /calendar_events/{eventId} {
+      allow read, write: if isSignedIn();
+    }
+    match /holidays/{holidayId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Salary & Company settings
+    match /salary_settings/{settingId} {
+      allow read, write: if isSignedIn();
+    }
+    match /company_settings/{settingId} {
+      allow read, write: if isSignedIn();
+    }
+
     // Employees legacy collection if referenced
     match /employees/{employeeId} {
       allow read: if isSignedIn();
