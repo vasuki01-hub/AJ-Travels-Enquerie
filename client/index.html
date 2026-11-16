@@ -17,7 +17,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <script>
         /* Suppress external browser extension injection errors (e.g. 200.js, VoiceStudio M_ID) */
-        window.addEventListener('unhandledrejection', function(event) {
+        window.addEventListener('unhandledrejection', function (event) {
             const reason = event.reason;
             const msg = (reason && (reason.message || String(reason))) || '';
             const stack = (reason && reason.stack) || '';
@@ -28,7 +28,7 @@
             }
         }, true);
 
-        window.addEventListener('error', function(event) {
+        window.addEventListener('error', function (event) {
             const msg = event.message || '';
             const filename = event.filename || '';
             if (msg.includes('M_ID') || filename.includes('200.js') || filename.includes('fiveserver')) {
@@ -7171,9 +7171,9 @@
                         ` : `
                             <div style="display:flex;flex-direction:column;gap:8px">
                                 ${[...overdue, ...dueToday, ...upcomingFollow].slice(0, 5).map(i => {
-                                    const isO = i.followUpDate < todayStr;
-                                    const isT = i.followUpDate === todayStr;
-                                    return `
+                    const isO = i.followUpDate < todayStr;
+                    const isT = i.followUpDate === todayStr;
+                    return `
                                         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 12px;background:var(--muted);border-radius:6px;font-size:13px">
                                             <div>
                                                 <strong>${Utils.escapeHtml(i.name || i.clientName || 'Client')}</strong>
@@ -7189,7 +7189,7 @@
                                             </div>
                                         </div>
                                     `;
-                                }).join('')}
+                }).join('')}
                             </div>
                         `}
                     </div>
@@ -8561,12 +8561,12 @@
                                     </thead>
                                     <tbody>
                                         ${employees.map(e => {
-                                            const eInqs = filteredInqs.filter(i => i.employeeId === e.id || i.assignedTo === e.id);
-                                            const eBks = filteredBks.filter(b => b.employeeId === e.id || b.assignedTo === e.id || b.consultantId === e.id);
-                                            const tot = eInqs.length + eBks.length;
-                                            const rate = tot > 0 ? Math.round((eBks.length / tot) * 100) : 0;
-                                            const sales = eBks.reduce((acc, b) => acc + Utils.salesAmount(b), 0);
-                                            return `
+                    const eInqs = filteredInqs.filter(i => i.employeeId === e.id || i.assignedTo === e.id);
+                    const eBks = filteredBks.filter(b => b.employeeId === e.id || b.assignedTo === e.id || b.consultantId === e.id);
+                    const tot = eInqs.length + eBks.length;
+                    const rate = tot > 0 ? Math.round((eBks.length / tot) * 100) : 0;
+                    const sales = eBks.reduce((acc, b) => acc + Utils.salesAmount(b), 0);
+                    return `
                                                 <tr>
                                                     <td><strong>${Utils.escapeHtml(e.name || e.fullName || '—')}</strong></td>
                                                     <td><span class="rank-badge">${Utils.escapeHtml(e.rank || 'Consultant')}</span></td>
@@ -8576,7 +8576,7 @@
                                                     <td><strong>${Utils.formatCurrency(sales)}</strong></td>
                                                 </tr>
                                             `;
-                                        }).join('')}
+                }).join('')}
                                     </tbody>
                                 </table>
                             </div>
@@ -10560,16 +10560,16 @@
                                     </thead>
                                     <tbody>
                                         ${filtered.length > 0 ? filtered.map(l => {
-                                            const isPending = l.status === 'Pending';
-                                            const isApproved = l.status === 'Approved';
-                                            const badgeStyle = isPending ? 'background:#fef3c7;color:#b45309;border:1px solid #fde68a;' : isApproved ? 'background:#dcfce7;color:#15803d;border:1px solid #bbf7d0;' : 'background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;';
-                                            const statusIcon = isPending ? '⏳' : isApproved ? '✓' : '✕';
-                                            const dateRangeStr = `${Utils.formatDate(l.startDate)} ${l.startDate !== l.endDate ? `– ${Utils.formatDate(l.endDate)}` : ''}`;
-                                            const daysStr = `${l.daysCount || 1} day${(l.daysCount || 1) > 1 ? 's' : ''}`;
-                                            const appliedStr = l.appliedAt ? new Date(l.appliedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
-                                            const remarks = l.actionNotes ? Utils.escapeHtml(l.actionNotes) : (isApproved && l.actionBy ? `Approved by ${Utils.escapeHtml(l.actionBy)}` : '—');
+                    const isPending = l.status === 'Pending';
+                    const isApproved = l.status === 'Approved';
+                    const badgeStyle = isPending ? 'background:#fef3c7;color:#b45309;border:1px solid #fde68a;' : isApproved ? 'background:#dcfce7;color:#15803d;border:1px solid #bbf7d0;' : 'background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;';
+                    const statusIcon = isPending ? '⏳' : isApproved ? '✓' : '✕';
+                    const dateRangeStr = `${Utils.formatDate(l.startDate)} ${l.startDate !== l.endDate ? `– ${Utils.formatDate(l.endDate)}` : ''}`;
+                    const daysStr = `${l.daysCount || 1} day${(l.daysCount || 1) > 1 ? 's' : ''}`;
+                    const appliedStr = l.appliedAt ? new Date(l.appliedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
+                    const remarks = l.actionNotes ? Utils.escapeHtml(l.actionNotes) : (isApproved && l.actionBy ? `Approved by ${Utils.escapeHtml(l.actionBy)}` : '—');
 
-                                            return `
+                    return `
                                             <tr>
                                                 ${isAdmin ? `
                                                 <td>
@@ -10622,7 +10622,7 @@
                                                 </td>
                                             </tr>
                                             `;
-                                        }).join('') : `
+                }).join('') : `
                                             <tr>
                                                 <td colspan="${isAdmin ? 8 : 7}" class="text-center text-muted py-8">
                                                     <i class="uil uil-plane-arrival" style="font-size:32px;color:#94a3b8;display:block;margin-bottom:8px;"></i>
@@ -11813,7 +11813,7 @@
                 if (F?.auth?.currentUser) {
                     try {
                         await F.deleteUser(F.auth.currentUser);
-                    } catch (_) {}
+                    } catch (_) { }
                 }
                 Auth.setUser(null);
                 Utils.showToast('Account Permanently Deleted', 'Your account has been permanently removed.', 'destructive');
@@ -12042,7 +12042,7 @@
                             Configure dynamic fields for company operations (e.g., IATA Agency Number, Branch Office, Emergency Desk, Corporate Bank Details). Add, edit, or remove fields according to your business needs.
                         </div>
 
-                        <div class="table-container" style="background:#ffffff;border-radius:14px;box-shadow:2px 2px 6px rgba(0,0,0,0.03);overflow:hidden;">
+                        <div class="table-container" style="background:#ffffff;border-radius:14px;box-shadow:2px 2px 6px rgba(0,0,0,0.03);overflow:auto;">
                             <table class="table">
                                 <thead>
                                     <tr>
@@ -12116,7 +12116,7 @@
                             Manage paid and unpaid leave categories. Unpaid leaves automatically deduct salary based on days taken. Adjust quotas and leave classification dynamically.
                         </div>
 
-                        <div class="table-container" style="background:#ffffff;border-radius:14px;box-shadow:2px 2px 6px rgba(0,0,0,0.03);overflow:hidden;margin-bottom:24px;">
+                        <div class="table-container" style="background:#ffffff;border-radius:14px;box-shadow:2px 2px 6px rgba(0,0,0,0.03);overflow:auto;margin-bottom:24px;">
                             <table class="table">
                                 <thead>
                                     <tr>
@@ -12225,7 +12225,7 @@
                             Add, edit, or remove custom policy conditions according to business rules (e.g. Probation Duration, Notice Period, Travel Perk Allowances, Overtime Multipliers).
                         </div>
 
-                        <div class="table-container" style="background:#ffffff;border-radius:14px;box-shadow:2px 2px 6px rgba(0,0,0,0.03);overflow:hidden;">
+                        <div class="table-container" style="background:#ffffff;border-radius:14px;box-shadow:2px 2px 6px rgba(0,0,0,0.03);overflow:auto;">
                             <table class="table">
                                 <thead>
                                     <tr>
@@ -12444,7 +12444,7 @@
                             Configure custom filter presets that appear in dropdowns across <strong>Dashboard</strong> and <strong>Reports</strong> (e.g. Current Month, Year 2026, High Value Fares, London Destination, Completed Files).
                         </div>
 
-                        <div class="table-container" style="background:#ffffff;border-radius:14px;box-shadow:2px 2px 6px rgba(0,0,0,0.03);overflow:hidden;">
+                        <div class="table-container" style="background:#ffffff;border-radius:14px;box-shadow:2px 2px 6px rgba(0,0,0,0.03);overflow:auto;">
                             <table class="table">
                                 <thead>
                                     <tr>
@@ -12641,7 +12641,7 @@
 
                 const att = Storage.getAttendance() || [];
                 const attRows = [['Date', 'Staff', 'Check In', 'Check Out', 'Hours', 'Status', 'Notes']];
-                att.forEach(a => attRows.push([a.date, a.employeeName || a.empName || '', a.clockIn || '', a.clockOut || '', Math.round((a.durationMinutes || 0)/60), a.status, a.notes || '']));
+                att.forEach(a => attRows.push([a.date, a.employeeName || a.empName || '', a.clockIn || '', a.clockOut || '', Math.round((a.durationMinutes || 0) / 60), a.status, a.notes || '']));
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(attRows), 'Attendance');
 
                 const exp = Storage.getExpenses() || [];
@@ -12660,7 +12660,7 @@
                 Utils.showToast('System Maintenance', enabled ? 'Maintenance advisory broadcast enabled.' : 'Maintenance advisory deactivated.');
             },
 
-            afterRender() {}
+            afterRender() { }
         };
 
         /* ---------- Employees Module (Admin Portal) ---------- */
@@ -12697,12 +12697,12 @@
                                     </thead>
                                     <tbody>
                                         ${trash.map(t => {
-                                            const elapsed = Date.now() - (t.deletedAt || Date.now());
-                                            const remainingMs = Math.max(0, Storage.RECOVERY_WINDOW_MS - elapsed);
-                                            const remainingHours = Math.floor(remainingMs / (3600 * 1000));
-                                            const remainingMins = Math.floor((remainingMs % (3600 * 1000)) / 60000);
-                                            const timeString = `${remainingHours}h ${remainingMins}m remaining`;
-                                            return `
+                    const elapsed = Date.now() - (t.deletedAt || Date.now());
+                    const remainingMs = Math.max(0, Storage.RECOVERY_WINDOW_MS - elapsed);
+                    const remainingHours = Math.floor(remainingMs / (3600 * 1000));
+                    const remainingMins = Math.floor((remainingMs % (3600 * 1000)) / 60000);
+                    const timeString = `${remainingHours}h ${remainingMins}m remaining`;
+                    return `
                                                 <tr>
                                                     <td>
                                                         <strong>${Utils.escapeHtml(t.name || t.fullName || 'Employee')}</strong>
@@ -12727,7 +12727,7 @@
                                                     </td>
                                                 </tr>
                                             `;
-                                        }).join('')}
+                }).join('')}
                                     </tbody>
                                 </table>
                             </div>
@@ -12769,18 +12769,18 @@
                                 </thead>
                                 <tbody>
                                     ${employees.length ? employees.map(e => {
-                                        const initials = (e.name || e.fullName || 'EM').trim().split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase() || 'EM';
-                                        const uidStr = e.uid || e.employeeId || ('AJ-EMP-' + (e.id || '').slice(0, 6).toUpperCase());
-                                        const salarySet = Storage.getSalarySettings(e.id);
-                                        const baseSalaryStr = Utils.formatCurrency(Number(e.baseSalary) || Number(salarySet.baseSalary) || 2800);
-                                        const joinDateStr = e.joinDate ? Utils.formatDate(e.joinDate) : '—';
-                                        const shiftInStr = Utils.formatTime12(e.shiftIn || '09:00');
-                                        const shiftOutStr = Utils.formatTime12(e.shiftOut || '17:30');
-                                        const weekOffDays = Storage.getEmployeeWeekOff(e.id);
-                                        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-                                        const weekOffStr = weekOffDays.map(d => dayNames[d]).join(', ');
+                    const initials = (e.name || e.fullName || 'EM').trim().split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase() || 'EM';
+                    const uidStr = e.uid || e.employeeId || ('AJ-EMP-' + (e.id || '').slice(0, 6).toUpperCase());
+                    const salarySet = Storage.getSalarySettings(e.id);
+                    const baseSalaryStr = Utils.formatCurrency(Number(e.baseSalary) || Number(salarySet.baseSalary) || 2800);
+                    const joinDateStr = e.joinDate ? Utils.formatDate(e.joinDate) : '—';
+                    const shiftInStr = Utils.formatTime12(e.shiftIn || '09:00');
+                    const shiftOutStr = Utils.formatTime12(e.shiftOut || '17:30');
+                    const weekOffDays = Storage.getEmployeeWeekOff(e.id);
+                    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                    const weekOffStr = weekOffDays.map(d => dayNames[d]).join(', ');
 
-                                        return `
+                    return `
                                         <tr>
                                             <td>
                                                 <div style="display:flex;align-items:center;gap:12px;">
@@ -12830,7 +12830,7 @@
                                             </td>
                                         </tr>
                                     `;
-                                    }).join('') : '<tr><td colspan="9" class="text-center text-muted py-8">No active employee records in database. Click "Add New Employee" to get started.</td></tr>'}
+                }).join('') : '<tr><td colspan="9" class="text-center text-muted py-8">No active employee records in database. Click "Add New Employee" to get started.</td></tr>'}
                                 </tbody>
                             </table>
                         </div>
