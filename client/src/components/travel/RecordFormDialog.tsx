@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Minus, Plus, RotateCcw, X } from "lucide-react";
+import { getCurrencySymbol } from "@shared/currencies";
 import { DEFAULT_RECORD, type CustomField, type RecordType, type TravelRecord, type TravelRecordInput } from "@shared/travel";
 
 type Props = {
@@ -68,7 +69,7 @@ export default function RecordFormDialog({ open, initial, initialType, initialSo
   const [saving, setSaving] = useState(false);
   const isEdit = Boolean(initial?.id);
   const isBooking = values.recordType === "booking";
-  const currencySymbol = currency === "EUR" ? "€" : currency === "USD" ? "$" : "£";
+  const currencySymbol = getCurrencySymbol(currency);
   const activeCustomFields = useMemo(() => customFields.filter(field => field.enabled), [customFields]);
 
   useEffect(() => {

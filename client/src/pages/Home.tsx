@@ -1,4 +1,4 @@
-import { Fragment, lazy, Suspense, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { Fragment, lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   ArrowDownRight, ArrowRight, ArrowUpRight, BarChart3, CalendarDays, Check,
   ChevronDown, CircleDollarSign, Clock3, Compass, Download, FileSpreadsheet,
@@ -6,6 +6,7 @@ import {
   Pencil, Phone, Plane, Plus, Search, Settings, Sparkles, Ticket, Trash2, TrendingUp,
   UserRound, UsersRound, Wallet, X, type LucideIcon,
 } from "lucide-react";
+import { CURRENCIES } from "@shared/currencies";
 import { toast } from "sonner";
 import { startLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
@@ -80,7 +81,7 @@ function recordInput(record: TravelRecord, recordType = record.recordType, statu
     netFareAdult: Number(record.netFareAdult || 0), netFareYouth: Number(record.netFareYouth || 0), netFareChild: Number(record.netFareChild || 0), netFareInfant: Number(record.netFareInfant || 0),
     totalNet: Number(record.totalNet || 0), quotedFare: Number(record.quotedFare || 0), clientFareAdult: Number(record.clientFareAdult || 0), clientFareYouth: Number(record.clientFareYouth || 0),
     clientFareChild: Number(record.clientFareChild || 0), clientFareInfant: Number(record.clientFareInfant || 0), totalFareQuoted: Number(record.totalFareQuoted || 0), profit: Number(record.profit || 0),
-    receivedPayment: Number(record.receivedPayment || 0), paymentStatus: record.paymentStatus ?? "pending", paymentDate: record.paymentDate ?? "", paymentMode: record.paymentMode ?? "", issuedFrom: record.issuedFrom ?? "", remarks: record.remarks ?? "", customFields: record.customFields ?? {},
+    receivedPayment: Number(record.receivedPayment || 0), paymentStatus: record.paymentStatus ?? "pending", paymentDate: record.paymentDate ?? "", paymentMode: record.paymentMode ?? "", issuedFrom: record.issuedFrom ?? "", remarks: record.remarks ?? "", customFields: record.customFields ?? {}, followUpDate: record.followUpDate ?? "",
   };
 }
 
@@ -241,6 +242,150 @@ function Reports({ records, settings, globalPeriod }: { records: TravelRecord[];
   </div>;
 }
 
+// ─── Searchable Currency Picker ─────────────────────────────────────────────
+function CurrencyPicker({ value, onChange, disabled }: {
+  value: string;
+  onChange: (code: string) => void;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Sort currencies A-Z by country (already done in currencies.ts .sort)
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return CURRENCIES;
+    return CURRENCIES.filter(c =>
+      c.country.toLowerCase().includes(q) ||
+      c.code.toLowerCase().includes(q) ||
+      c.name.toLowerCase().includes(q)
+    );
+  }, [query]);
+
+  const selected = CURRENCIES.find(c => c.code === value);
+  const displayLabel = selected
+    ? `${selected.flag} ${selected.code} · ${selected.country}`
+    : value || "Select currency";
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (!containerRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  // Focus search when opened
+  useEffect(() => {
+    if (open) setTimeout(() => inputRef.current?.focus(), 10);
+  }, [open]);
+
+  return (
+    <div ref={containerRef} className="currency-picker" style={{ position: "relative" }}>
+      <button
+        type="button"
+        disabled={disabled}
+        className="currency-picker-trigger"
+        onClick={() => !disabled && setOpen(o => !o)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        style={{
+          display: "flex", alignItems: "center", gap: "0.5rem",
+          width: "100%", padding: "0.5rem 0.75rem", border: "1px solid var(--border)",
+          borderRadius: "0.5rem", background: disabled ? "var(--muted)" : "var(--surface-alt, #fff)",
+          cursor: disabled ? "not-allowed" : "pointer", fontSize: "0.9rem",
+          color: "var(--text)", textAlign: "left", justifyContent: "space-between",
+        }}
+      >
+        <span>{displayLabel}</span>
+        <ChevronDown size={14} style={{ opacity: 0.6, transform: open ? "rotate(180deg)" : undefined, transition: "transform 0.15s" }} />
+      </button>
+
+      {open && (
+        <div
+          role="listbox"
+          aria-label="Select currency"
+          style={{
+            position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
+            zIndex: 200, background: "#fff", border: "1px solid var(--border)",
+            borderRadius: "0.5rem", boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+            display: "flex", flexDirection: "column", maxHeight: "280px",
+          }}
+        >
+          {/* Search box */}
+          <div style={{ padding: "0.5rem", borderBottom: "1px solid var(--border)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.3rem 0.5rem", border: "1px solid var(--border)", borderRadius: "0.4rem" }}>
+              <Search size={14} style={{ opacity: 0.5, flexShrink: 0 }} />
+              <input
+                ref={inputRef}
+                type="text"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="Search country, code or currency…"
+                style={{ border: "none", outline: "none", flex: 1, fontSize: "0.85rem", background: "transparent" }}
+                onKeyDown={e => {
+                  if (e.key === "Escape") setOpen(false);
+                  if (e.key === "Enter" && filtered.length === 1) {
+                    onChange(filtered[0].code); setOpen(false); setQuery("");
+                  }
+                }}
+              />
+              {query && (
+                <button type="button" onClick={() => setQuery("")} style={{ border: "none", background: "none", cursor: "pointer", padding: 0, lineHeight: 1 }}>
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Scrollable list */}
+          <div style={{ overflowY: "auto", flex: 1 }}>
+            {filtered.length === 0 ? (
+              <div style={{ padding: "1rem", textAlign: "center", color: "var(--muted-foreground)", fontSize: "0.85rem" }}>
+                No currencies match "{query}"
+              </div>
+            ) : (
+              filtered.map(c => (
+                <button
+                  key={`${c.code}-${c.country}`}
+                  type="button"
+                  role="option"
+                  aria-selected={c.code === value}
+                  onClick={() => { onChange(c.code); setOpen(false); setQuery(""); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: "0.6rem",
+                    width: "100%", padding: "0.45rem 0.75rem", border: "none",
+                    background: c.code === value ? "var(--accent-10, #e8f0fe)" : "transparent",
+                    cursor: "pointer", textAlign: "left", fontSize: "0.85rem",
+                    color: "var(--text)",
+                    borderLeft: c.code === value ? "3px solid var(--accent, #1677e8)" : "3px solid transparent",
+                  }}
+                >
+                  <span style={{ fontSize: "1.1em" }}>{c.flag}</span>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <strong style={{ display: "block", lineHeight: 1.2 }}>{c.country}</strong>
+                    <small style={{ color: "var(--muted-foreground, #666)" }}>{c.code} · {c.name}</small>
+                  </span>
+                  {c.code === value && <Check size={13} style={{ color: "var(--accent, #1677e8)", flexShrink: 0 }} />}
+                </button>
+              ))
+            )}
+          </div>
+
+          {/* Footer with count */}
+          <div style={{ padding: "0.3rem 0.75rem", borderTop: "1px solid var(--border)", fontSize: "0.75rem", color: "var(--muted-foreground, #666)" }}>
+            {filtered.length} {filtered.length === 1 ? "currency" : "currencies"} · sorted A–Z by country
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SettingsPage({ settings, onSave, hasRecords }: { settings: PortalSettings; onSave: (settings: PortalSettings) => Promise<void>; hasRecords: boolean }) {
   const [agencyName, setAgencyName] = useState(settings.agencyName);
   const [logoUrl, setLogoUrl] = useState(settings.logoUrl);
@@ -266,7 +411,7 @@ function SettingsPage({ settings, onSave, hasRecords }: { settings: PortalSettin
   const toggle = (key: keyof PortalSettings["modules"]) => setModules(current => ({ ...current, [key]: !current[key] }));
   return <div className="page-stack settings-page">
     <section className="settings-intro"><div><span className="eyebrow">MAKE THE DESK YOURS</span><h2>Settings & <em>preferences.</em></h2><p>Shape the workspace for the way your team works.</p></div><button className="button button-primary" onClick={submit} disabled={saving}><Check size={16} />{saving ? "Saving…" : "Save settings"}</button></section>
-    <section className="surface settings-card"><div className="settings-card-head"><span className="settings-icon settings-blue"><Compass size={19} /></span><div><h3>Agency profile</h3><p>Your brand details used across the employee portal.</p></div></div><div className="profile-settings-grid"><div className="brand-preview"><BrandMark settings={{ ...settings, agencyName, logoUrl }} /><div><strong>{agencyName || "AJ Tours & Travel"}</strong><span>Portal identity preview</span></div></div><label className="form-field"><span>Agency name</span><input value={agencyName} onChange={event => setAgencyName(event.target.value)} placeholder="AJ Tours & Travel" /></label><label className="form-field"><span>Logo image URL <small>HTTPS</small></span><input value={logoUrl} onChange={event => setLogoUrl(event.target.value)} placeholder="https://…" /></label><label className="form-field"><span>Report currency <small>{hasRecords ? "Locked" : "Change before adding records"}</small></span><select disabled={hasRecords} value={currency} onChange={event => setCurrency(event.target.value as PortalSettings["currency"])}><option value="GBP">GBP · British pound</option><option value="EUR">EUR · Euro</option><option value="USD">USD · US dollar</option></select>{hasRecords && <small className="field-note">Existing fares are not converted automatically, so currency is locked after the first record.</small>}</label><label className="form-field"><span>Signature colour</span><div className="color-input-row"><input type="color" value={accentColor} onChange={event => setAccentColor(event.target.value)} /><input value={accentColor} onChange={event => /^#[0-9a-fA-F]{0,6}$/.test(event.target.value) && setAccentColor(event.target.value)} /></div></label></div></section>
+    <section className="surface settings-card"><div className="settings-card-head"><span className="settings-icon settings-blue"><Compass size={19} /></span><div><h3>Agency profile</h3><p>Your brand details used across the employee portal.</p></div></div><div className="profile-settings-grid"><div className="brand-preview"><BrandMark settings={{ ...settings, agencyName, logoUrl }} /><div><strong>{agencyName || "AJ Tours & Travel"}</strong><span>Portal identity preview</span></div></div><label className="form-field"><span>Agency name</span><input value={agencyName} onChange={event => setAgencyName(event.target.value)} placeholder="AJ Tours & Travel" /></label><label className="form-field"><span>Logo image URL <small>HTTPS</small></span><input value={logoUrl} onChange={event => setLogoUrl(event.target.value)} placeholder="https://…" /></label><label className="form-field"><span>Report currency <small>{hasRecords ? "Locked" : "Change before adding records"}</small></span><CurrencyPicker value={currency} onChange={code => setCurrency(code as PortalSettings["currency"])} disabled={hasRecords} />{hasRecords && <small className="field-note">Existing fares are not converted automatically, so currency is locked after the first record.</small>}</label><label className="form-field"><span>Signature colour</span><div className="color-input-row"><input type="color" value={accentColor} onChange={event => setAccentColor(event.target.value)} /><input value={accentColor} onChange={event => /^#[0-9a-fA-F]{0,6}$/.test(event.target.value) && setAccentColor(event.target.value)} /></div></label></div></section>
     <section className="surface settings-card"><div className="settings-card-head"><span className="settings-icon settings-lilac"><LayoutDashboard size={19} /></span><div><h3>Workspace features</h3><p>Choose which areas appear in your team's navigation. Settings stays available.</p></div></div><div className="module-list">{([
       ["dashboard", "Dashboard", "Overview metrics, upcoming departures and recent updates", LayoutDashboard],
       ["enquiries", "Enquiries", "Lead pipeline, follow-ups and quote tracking", UsersRound],
