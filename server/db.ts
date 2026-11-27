@@ -2,8 +2,11 @@ import { and, desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, portalSettings, travelRecords, users } from "../drizzle/schema";
 import type { PortalSettings, TravelRecordInput } from "../shared/travel";
+import { CURRENCIES } from "../shared/currencies";
 import { DEFAULT_PORTAL_SETTINGS } from "../shared/travel";
 import { ENV } from "./_core/env";
+
+const VALID_CURRENCY_CODES = new Set(CURRENCIES.map(c => c.code));
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -101,6 +104,14 @@ export async function listTravelRecords() {
   return rows.map(normalizeTravelRow);
 }
 
+export async function getTravelRecordById(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const rows = await db.select().from(travelRecords).where(eq(travelRecords.id, id)).limit(1);
+  const row = rows[0];
+  return row ? normalizeTravelRow(row) : null;
+}
+
 export async function createTravelRecord(record: TravelRecordInput, createdBy?: number) {
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
@@ -178,7 +189,7 @@ export async function getPortalSettings(): Promise<PortalSettings> {
   return {
     agencyName: row.agencyName,
     logoUrl: row.logoUrl ?? "",
-    currency: (["GBP", "EUR", "USD"].includes(row.currency) ? row.currency : "GBP") as PortalSettings["currency"],
+    currency: (VALID_CURRENCY_CODES.has(row.currency) ? row.currency : DEFAULT_PORTAL_SETTINGS.currency) as PortalSettings["currency"],
     accentColor: row.accentColor,
     modules: { ...DEFAULT_PORTAL_SETTINGS.modules, ...parseJson<Partial<PortalSettings["modules"]>>(row.modules, {}) },
     customFields: parseJson<PortalSettings["customFields"]>(row.customFields, []),

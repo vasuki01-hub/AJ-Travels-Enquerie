@@ -1,8 +1,10 @@
 import { COOKIE_NAME } from "@shared/const";
+import { CURRENCIES } from "@shared/currencies";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import * as db from "./db";
 
 const nullableDate = z.string().max(10).optional().default("");
@@ -45,7 +47,8 @@ const recordSchema = z.object({
   paymentMode: z.string().max(64).optional().default(""),
   issuedFrom: z.string().max(120).optional().default(""),
   remarks: z.string().max(10000).optional().default(""),
-  customFields: z.record(z.string(), z.string()).optional().default({}),
+  customFields: z.record(z.string().max(50), z.string().max(2000)).optional().default({}),
+  followUpDate: nullableDate,
 });
 
 const customFieldSchema = z.object({
@@ -55,10 +58,12 @@ const customFieldSchema = z.object({
   enabled: z.boolean(),
 });
 
+const VALID_CURRENCY_CODES = CURRENCIES.map(c => c.code).filter((v, i, a) => a.indexOf(v) === i) as [string, ...string[]];
+
 const settingsSchema = z.object({
   agencyName: z.string().trim().min(1).max(160),
   logoUrl: z.string().max(2000).refine(value => !value || /^https:\/\//i.test(value), "Logo URL must be HTTPS"),
-  currency: z.enum(["GBP", "EUR", "USD"]),
+  currency: z.enum(VALID_CURRENCY_CODES),
   accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   modules: z.object({
     dashboard: z.boolean(), enquiries: z.boolean(), bookings: z.boolean(), reports: z.boolean(),
@@ -81,12 +86,31 @@ export const appRouter = router({
     create: protectedProcedure.input(recordSchema).mutation(({ ctx, input }) =>
       db.createTravelRecord(input, ctx.user.id),
     ),
-    update: protectedProcedure.input(z.object({ id: z.number().int().positive(), data: recordSchema }))
-      .mutation(({ input }) => db.updateTravelRecord(input.id, input.data)),
-    remove: protectedProcedure.input(z.object({ id: z.number().int().positive() }))
-      .mutation(({ input }) => db.deleteTravelRecord(input.id)),
+    update: protectedProcedure
+      .input(z.object({ id: z.number().int().positive(), data: recordSchema }))
+      .mutation(async ({ ctx, input }) => {
+        // Authorization: only the record creator or an admin may update it.
+        const existing = await db.getTravelRecordById(input.id);
+        if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Record not found" });
+        if (ctx.user.role !== "admin" && existing.createdBy !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You do not have permission to edit this record" });
+        }
+        return db.updateTravelRecord(input.id, input.data);
+      }),
+    remove: protectedProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        // Authorization: only the record creator or an admin may delete it.
+        const existing = await db.getTravelRecordById(input.id);
+        if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Record not found" });
+        if (ctx.user.role !== "admin" && existing.createdBy !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You do not have permission to delete this record" });
+        }
+        return db.deleteTravelRecord(input.id);
+      }),
     settings: protectedProcedure.query(() => db.getPortalSettings()),
-    saveSettings: protectedProcedure.input(settingsSchema).mutation(({ input }) =>
+    // Only admins may change portal settings.
+    saveSettings: adminProcedure.input(settingsSchema).mutation(({ input }) =>
       db.savePortalSettings(input),
     ),
   }),

@@ -1,7 +1,7 @@
 rules_version = '2';
 
 // Firestore Security Rules for AJ Tours & Travel
-// Protects database while allowing proper collection listeners for signed-in staff.
+// Hardened server-side enforcement: active status checks, anti-escalation, and strict participant isolation.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -11,7 +11,13 @@ service cloud.firestore {
 
     function isOwnerEmail() {
       return isSignedIn()
-        && request.auth.token.get('email', '').lower() == 'pgboss07@gmail.com';
+        && 'email' in request.auth.token
+        && request.auth.token.email != null
+        && (
+          request.auth.token.email.lower() == 'pgboss07@gmail.com'
+          || request.auth.token.email.lower() == 'admin@ajtravels.com'
+          || request.auth.token.email.lower() == 'boss@ajtravels.com'
+        );
     }
 
     function userDoc() {
@@ -22,90 +28,198 @@ service cloud.firestore {
       return isSignedIn()
         && (
           isOwnerEmail()
-          || (exists(userDoc()) && get(userDoc()).data.get('role', '') == 'admin')
+          || (
+            exists(userDoc())
+            && get(userDoc()).data.get('role', '') == 'admin'
+            && get(userDoc()).data.get('status', 'active') == 'active'
+          )
         );
     }
 
-    // User profiles: allow read so staff listings & assignments work smoothly
+    function isActiveStaff() {
+      return isAdmin()
+        || (
+          isSignedIn()
+          && exists(userDoc())
+          && get(userDoc()).data.get('status', '') == 'active'
+        );
+    }
+
+    // Inquiries & bookings belong to creator / assigned employee / owner
+    function isRecordParticipant(res) {
+      return isSignedIn()
+        && (
+          res.data.get('createdBy', '') == request.auth.uid
+          || res.data.get('employeeId', '') == request.auth.uid
+          || res.data.get('assignedTo', '') == request.auth.uid
+        );
+    }
+
+    // Attendance & leave records use employeeId / empId
+    function isStaffSelf(res) {
+      return isSignedIn()
+        && (
+          res.data.get('employeeId', '') == request.auth.uid
+          || res.data.get('empId', '') == request.auth.uid
+        );
+    }
+
+    // User profiles: block pending/unapproved users from listing team data & block self-promotion to admin
     match /users/{userId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.auth.uid == userId;
-      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      // Account self-deletion or admin deletion
-      allow delete: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow get: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
+      allow list: if isAdmin();
+      allow create: if isSignedIn()
+        && request.auth.uid == userId
+        && (
+          isOwnerEmail()
+          || (
+            request.resource.data.get('role', 'employee') == 'employee'
+            && request.resource.data.get('status', 'pending') == 'pending'
+          )
+        );
+      allow update: if isAdmin()
+        || (
+          isActiveStaff()
+          && request.auth.uid == userId
+          && request.resource.data.get('role', 'employee') == resource.data.get('role', 'employee')
+          && request.resource.data.get('status', 'active') == resource.data.get('status', 'active')
+          && request.resource.data.get('baseSalary', 0) == resource.data.get('baseSalary', 0)
+        );
+      allow delete: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
     }
 
-    // Contact lookup for phone/email login resolution
+    // Contact lookup: allow single-doc lookup for login resolution, block full-collection listing
     match /contactIndex/{contactId} {
-      allow read: if true;
-      allow create, update: if isSignedIn();
-      allow delete: if isAdmin();
+      allow get: if true;
+      allow list: if false;
+      allow create, update: if isSignedIn() && request.resource.data.get('uid', '') == request.auth.uid;
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.get('uid', '') == request.auth.uid);
     }
 
-    // Inquiries: data isolation handled client-side in Storage.getInquiries()
+    // Inquiries: active staff can only read/write their own or assigned inquiries; admin sees all
     match /inquiries/{inquiryId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow read: if isAdmin() || (isActiveStaff() && isRecordParticipant(resource));
+      allow create: if isAdmin()
+        || (
+          isActiveStaff()
+          && request.resource.data.get('employeeId', '') == request.auth.uid
+          && request.resource.data.get('createdBy', '') == request.auth.uid
+        );
+      allow update: if isAdmin()
+        || (
+          isActiveStaff()
+          && isRecordParticipant(resource)
+          && request.resource.data.get('employeeId', '') == resource.data.get('employeeId', '')
+          && request.resource.data.get('createdBy', '') == resource.data.get('createdBy', '')
+        );
+      allow delete: if isAdmin() || (isActiveStaff() && isRecordParticipant(resource));
     }
 
-    // Bookings: data isolation handled client-side in Storage.getBookings()
+    // Bookings: active staff can only read/write their own or assigned bookings; admin sees all
     match /bookings/{bookingId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow read: if isAdmin() || (isActiveStaff() && isRecordParticipant(resource));
+      allow create: if isAdmin()
+        || (
+          isActiveStaff()
+          && request.resource.data.get('employeeId', '') == request.auth.uid
+          && request.resource.data.get('createdBy', '') == request.auth.uid
+        );
+      allow update: if isAdmin()
+        || (
+          isActiveStaff()
+          && isRecordParticipant(resource)
+          && request.resource.data.get('employeeId', '') == resource.data.get('employeeId', '')
+          && request.resource.data.get('createdBy', '') == resource.data.get('createdBy', '')
+        );
+      allow delete: if isAdmin() || (isActiveStaff() && isRecordParticipant(resource));
     }
 
-    // Attendance & Shifts
+    // Attendance & Shifts: uses employeeId / empId
     match /attendance/{attId} {
-      allow read, write: if isSignedIn();
+      allow read: if isAdmin() || (isActiveStaff() && isStaffSelf(resource));
+      allow create: if isAdmin() || (isActiveStaff() && request.resource.data.get('employeeId', '') == request.auth.uid);
+      allow update: if isAdmin()
+        || (
+          isActiveStaff()
+          && isStaffSelf(resource)
+          && request.resource.data.get('employeeId', '') == resource.data.get('employeeId', '')
+        );
+      allow delete: if isAdmin() || (isActiveStaff() && isStaffSelf(resource));
     }
 
-    // Leave Requests & Approvals
+    // Leave Requests: employees can create Pending requests for themselves and cancel Pending requests; only admins approve/reject
     match /leave_requests/{leaveId} {
-      allow read, write: if isSignedIn();
+      allow read: if isAdmin() || (isActiveStaff() && isStaffSelf(resource));
+      allow create: if isAdmin()
+        || (
+          isActiveStaff()
+          && request.resource.data.get('employeeId', '') == request.auth.uid
+          && request.resource.data.get('status', 'Pending') == 'Pending'
+        );
+      allow update: if isAdmin()
+        || (
+          isActiveStaff()
+          && isStaffSelf(resource)
+          && request.resource.data.get('employeeId', '') == resource.data.get('employeeId', '')
+          && request.resource.data.get('status', '') == resource.data.get('status', '')
+        );
+      allow delete: if isAdmin()
+        || (
+          isActiveStaff()
+          && isStaffSelf(resource)
+          && resource.data.get('status', '') == 'Pending'
+        );
     }
 
-    // Expenses
+    // Expenses: admin-only
     match /expenses/{expenseId} {
-      allow read, write: if isSignedIn();
+      allow read, write: if isAdmin();
     }
 
-    // Calendar events & holidays
+    // Calendar events: readable by active staff; creators (empId) or admins can edit/delete
     match /calendar_events/{eventId} {
-      allow read, write: if isSignedIn();
+      allow read: if isActiveStaff();
+      allow create: if isAdmin() || (isActiveStaff() && request.resource.data.get('empId', '') == request.auth.uid);
+      allow update, delete: if isAdmin() || (isActiveStaff() && resource.data.get('empId', '') == request.auth.uid);
     }
+
     match /holidays/{holidayId} {
-      allow read, write: if isSignedIn();
-    }
-
-    // Salary & Company settings
-    match /salary_settings/{settingId} {
-      allow read, write: if isSignedIn();
-    }
-    match /company_settings/{settingId} {
-      allow read, write: if isSignedIn();
-    }
-
-    // Employees legacy collection if referenced
-    match /employees/{employeeId} {
-      allow read: if isSignedIn();
+      allow read: if isActiveStaff();
       allow write: if isAdmin();
     }
 
-    // Activity & Audit logs
+    // Salary & Company settings: employees may only read their own salary_settings; writes are admin-only
+    match /salary_settings/{settingId} {
+      allow read: if isAdmin() || (isActiveStaff() && settingId == request.auth.uid);
+      allow write: if isAdmin();
+    }
+
+    match /company_settings/{settingId} {
+      allow read: if isActiveStaff();
+      allow write: if isAdmin();
+    }
+
+    // Legacy employees collection: admin-only
+    match /employees/{employeeId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Activity & Audit logs: append-only for active staff (userId bound to caller); read/delete by admin only
     match /audit_logs/{logId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update, delete: if false;
+      allow read: if isAdmin();
+      allow create: if isActiveStaff() && request.resource.data.get('userId', '') == request.auth.uid;
+      allow update, delete: if isAdmin();
     }
 
     // Settings
     match /settings/{settingId} {
-      allow read: if isSignedIn();
+      allow read: if isActiveStaff();
       allow write: if isAdmin();
+    }
+
+    // User-specific settings
+    match /user_settings/{userId} {
+      allow read, write: if isActiveStaff() && request.auth.uid == userId;
     }
   }
 }
