@@ -10706,12 +10706,6 @@
                 return Layout.render('Attendance &amp; Shifts', tabSwitcher + this.renderShiftsView(months, thisMonthStr));
             },
 
-                    return Layout.render('Attendance &amp; Payroll', tabSwitcher + this.renderSalaryView(months, thisMonthStr));
-                }
-
-                return Layout.render('Attendance &amp; Shifts', tabSwitcher + this.renderShiftsView(months, thisMonthStr));
-            },
-
             renderShiftsView(months, thisMonthStr) {
                 const authU = Auth.getUser() || { id: 'anon', name: 'Employee', role: 'employee' };
                 // Fetch the freshest employee profile to ensure shiftIn / shiftOut set by Admin is instantly visible
