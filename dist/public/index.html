@@ -5176,13 +5176,18 @@
             async applySelection(code) {
                 this.set(code);
                 const u = Auth.getUser();
-                if (u && window.Firebase?.db && FirestoreSync.dbAvailable !== false) {
+                const uid = window.Firebase?.auth?.currentUser?.uid || u?.id;
+                if (uid && window.Firebase?.db && FirestoreSync.dbAvailable !== false) {
                     try {
                         const F = window.Firebase;
-                        await F.setDoc(F.doc(F.db, 'users', u.id), { currencyCode: code }, { merge: true });
+                        await F.setDoc(F.doc(F.db, 'users', uid), { currencyCode: code }, { merge: true });
                     } catch (_) { }
                 }
                 this.refreshDisplayedAmounts();
+            },
+            syncFromCloud(code) {
+                if (!code || !this.OPTIONS.some(o => o.code === code)) return;
+                try { localStorage.setItem(this.KEY, code); } catch (_) { }
             },
             optionsHtml() {
                 return this.OPTIONS.map(o => `<option value="${Utils.escapeHtml(o.code)}">${Utils.escapeHtml(o.country || o.name)} · ${Utils.escapeHtml(o.label)}</option>`).join('');
@@ -5203,105 +5208,78 @@
             }
         };
 
-        /* ---------- Storage ---------- */
+        /* ---------- Storage (Firestore-Backed, In-Memory Cache Only) ---------- */
         const Storage = {
-            _inquiries: null,
-            _bookings: null,
-            _employees: null,
-            _attendance: null,
+            _inquiries: [],
+            _bookings: [],
+            _employees: [],
+            _attendance: [],
 
-            // Ensure arrays are never null — called by getters before any .filter()
+            clearLegacyLocalKeys() {
+                const keys = [
+                    'ajTravelsInquiries', 'ajTravelsBookings', 'ajTravelsEmployees',
+                    'ajTravelsAttendance', 'ajTravelsSalarySettings', 'ajTravelsHolidays',
+                    'ajTravelsCompanyConfig', 'ajTravelsLeaveRequests', 'ajTravelsExpenses',
+                    'ajCalendarEvents', 'ajHolidays', 'ajCompanySettings', 'ajAuditClearedBackup'
+                ];
+                try {
+                    keys.forEach(k => localStorage.removeItem(k));
+                    for (let idx = localStorage.length - 1; idx >= 0; idx--) {
+                        const k = localStorage.key(idx);
+                        if (k && k.startsWith('ajUserSettings_')) localStorage.removeItem(k);
+                    }
+                } catch (_) { }
+            },
+            clearAllLocalData() {
+                this.clearLegacyLocalKeys();
+                this._inquiries = [];
+                this._bookings = [];
+                this._employees = [];
+                this._attendance = [];
+                this._leaves = [];
+                this._expenses = [];
+                this._calendarEvents = [];
+                this._holidays = [];
+                this._companySettings = null;
+                this._salarySettings = {};
+                this._userSettings = {};
+                if (typeof Audit !== 'undefined') Audit._logs = [];
+            },
+
+            // Ensure arrays are always valid arrays in memory (populated by Cloud Firestore)
             _ensureInquiries() {
-                if (!Array.isArray(this._inquiries)) {
-                    try {
-                        const s = localStorage.getItem('ajTravelsInquiries');
-                        this._inquiries = s ? JSON.parse(s) : [];
-                    } catch (_) { this._inquiries = []; }
-                    if (!Array.isArray(this._inquiries)) this._inquiries = [];
-                }
+                if (!Array.isArray(this._inquiries)) this._inquiries = [];
                 return this._inquiries;
             },
             _ensureBookings() {
-                if (!Array.isArray(this._bookings)) {
-                    try {
-                        const s = localStorage.getItem('ajTravelsBookings');
-                        this._bookings = s ? JSON.parse(s) : [];
-                    } catch (_) { this._bookings = []; }
-                    if (!Array.isArray(this._bookings)) this._bookings = [];
-                }
+                if (!Array.isArray(this._bookings)) this._bookings = [];
                 return this._bookings;
             },
             getDefaultEmployees() {
-                return [
-                    {
-                        id: 'admin_boss_pgboss07',
-                        uid: 'AJ-EMP-001',
-                        name: 'Pritesh G (Boss)',
-                        fullName: 'Pritesh G (Boss)',
-                        email: 'pgboss07@gmail.com',
-                        phone: '+44 7911 123456',
-                        contact: '+44 7911 123456',
-                        role: 'admin',
-                        rank: 'Managing Director / Boss',
-                        joinDate: '2023-01-15',
-                        baseSalary: 5500,
-                        shiftIn: '09:00',
-                        shiftOut: '17:30',
-                        weekOff: [0],
-                        status: 'active'
-                    }
-                ];
+                return [];
             },
             _ensureEmployees() {
-                if (!Array.isArray(this._employees) || this._employees.length === 0) {
-                    try {
-                        const s = localStorage.getItem('ajTravelsEmployees');
-                        this._employees = s ? JSON.parse(s) : [];
-                    } catch (_) { this._employees = []; }
-                    if (!Array.isArray(this._employees) || this._employees.length === 0) {
-                        this._employees = this.getDefaultEmployees();
-                        try { localStorage.setItem('ajTravelsEmployees', JSON.stringify(this._employees)); } catch (_) { }
-                    }
-                }
-                // Strip any old demo seeds from local storage
-                const demoIds = ['emp_jane_smith', 'emp_john_doe', 'emp_alex_johnson'];
+                if (!Array.isArray(this._employees)) this._employees = [];
+                const demoIds = ['emp_jane_smith', 'emp_john_doe', 'emp_alex_johnson', 'admin_boss_pgboss07'];
                 this._employees = this._employees.filter(e => !demoIds.includes(e.id));
-
-                // Ensure pgboss07 always exists and has role 'admin' in employee list
-                const bossIdx = this._employees.findIndex(e => (e.email && e.email.toLowerCase() === 'pgboss07@gmail.com') || e.id === 'admin_boss_pgboss07');
-                if (bossIdx >= 0) {
-                    this._employees[bossIdx].role = 'admin';
-                } else {
-                    this._employees.unshift(this.getDefaultEmployees()[0]);
-                }
                 return this._employees;
             },
             _ensureAttendance() {
-                if (!Array.isArray(this._attendance)) {
-                    try {
-                        const s = localStorage.getItem('ajTravelsAttendance');
-                        this._attendance = s ? JSON.parse(s) : [];
-                    } catch (_) { this._attendance = []; }
-                    if (!Array.isArray(this._attendance)) this._attendance = [];
-                }
+                if (!Array.isArray(this._attendance)) this._attendance = [];
                 return this._attendance;
             },
 
             _writeInquiries(a) {
                 this._inquiries = Array.isArray(a) ? a : [];
-                try { localStorage.setItem('ajTravelsInquiries', JSON.stringify(this._inquiries)); } catch (_) { }
             },
             _writeBookings(a) {
                 this._bookings = Array.isArray(a) ? a : [];
-                try { localStorage.setItem('ajTravelsBookings', JSON.stringify(this._bookings)); } catch (_) { }
             },
             _writeEmployees(a) {
                 this._employees = Array.isArray(a) ? a : [];
-                try { localStorage.setItem('ajTravelsEmployees', JSON.stringify(this._employees)); } catch (_) { }
             },
             _writeAttendance(a) {
                 this._attendance = Array.isArray(a) ? a : [];
-                try { localStorage.setItem('ajTravelsAttendance', JSON.stringify(this._attendance)); } catch (_) { }
             },
 
             _adminStaffFilter: 'all',
@@ -5327,12 +5305,13 @@
             },
             saveInquiry(i) {
                 const u = Auth.getUser();
-                if (u) {
-                    i.employeeId = i.employeeId || u.id;
+                const fbUid = window.Firebase?.auth?.currentUser?.uid || u?.id;
+                if (u && fbUid) {
+                    i.employeeId = i.employeeId || fbUid;
                     i.employeeName = i.employeeName || u.name;
                     i.employeeEmail = i.employeeEmail || u.email;
-                    i.assignedTo = i.assignedTo || u.id;
-                    i.createdBy = i.createdBy || u.id;
+                    i.assignedTo = i.assignedTo || fbUid;
+                    i.createdBy = i.createdBy || fbUid;
                     i.createdByName = i.createdByName || u.name;
                     i.creatorRank = i.creatorRank || u.rank || 'Travel Consultant';
                 }
@@ -5378,12 +5357,13 @@
             },
             saveBooking(b) {
                 const u = Auth.getUser();
-                if (u) {
-                    b.employeeId = b.employeeId || u.id;
+                const fbUid = window.Firebase?.auth?.currentUser?.uid || u?.id;
+                if (u && fbUid) {
+                    b.employeeId = b.employeeId || fbUid;
                     b.employeeName = b.employeeName || u.name;
                     b.employeeEmail = b.employeeEmail || u.email;
-                    b.assignedTo = b.assignedTo || u.id;
-                    b.createdBy = b.createdBy || u.id;
+                    b.assignedTo = b.assignedTo || fbUid;
+                    b.createdBy = b.createdBy || fbUid;
                     b.createdByName = b.createdByName || u.name;
                 }
                 const a = this._ensureBookings();
@@ -5545,11 +5525,7 @@
             },
 
             clearLocalCache() {
-                try {
-                    localStorage.removeItem('ajTravelsSalarySettings');
-                    localStorage.removeItem('ajTravelsHolidays');
-                    localStorage.removeItem('ajTravelsCompanyConfig');
-                } catch (_) { }
+                this.clearLegacyLocalKeys();
                 if (typeof FirestoreSync !== 'undefined' && FirestoreSync.init) {
                     FirestoreSync.init();
                 }
@@ -5558,17 +5534,10 @@
             _salarySettings: {},
             _writeSalarySettings(s) {
                 this._salarySettings = s || {};
-                try { localStorage.setItem('ajTravelsSalarySettings', JSON.stringify(this._salarySettings)); } catch (_) { }
             },
             getSalarySettings(empId) {
                 if (!this._salarySettings || typeof this._salarySettings !== 'object') {
                     this._salarySettings = {};
-                }
-                if (Object.keys(this._salarySettings).length === 0) {
-                    try {
-                        const saved = localStorage.getItem('ajTravelsSalarySettings');
-                        if (saved) Object.assign(this._salarySettings, JSON.parse(saved));
-                    } catch (_) { }
                 }
                 const emps = this._ensureEmployees();
                 const emp = emps.find(x => String(x.id) === String(empId) || (x.uid && String(x.uid) === String(empId)));
@@ -5623,6 +5592,9 @@
                 return this._ensureAttendance().find(a => a.employeeId === empId && a.date === today);
             },
             saveAttendanceRecord(rec) {
+                const u = Auth.getUser();
+                const fbUid = window.Firebase?.auth?.currentUser?.uid || u?.id;
+                if (fbUid && !rec.employeeId) rec.employeeId = fbUid;
                 const a = this._ensureAttendance();
                 const idx = a.findIndex(x => x.id === rec.id);
                 idx >= 0 ? a[idx] = rec : a.push(rec);
@@ -5640,32 +5612,21 @@
 
             _leaves: [],
             _writeLeaves(a) {
-                this._leaves = a || [];
-                try { localStorage.setItem('ajTravelsLeaveRequests', JSON.stringify(this._leaves)); } catch (_) { }
+                this._leaves = Array.isArray(a) ? a : [];
             },
             getLeaves() {
-                if (!this._leaves || this._leaves.length === 0) {
-                    try {
-                        const s = localStorage.getItem('ajTravelsLeaveRequests');
-                        if (s) this._leaves = JSON.parse(s);
-                    } catch (_) { }
-                }
                 const u = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
                 if (!u) return [];
                 if (u.role === 'admin') return this._leaves || [];
                 return (this._leaves || []).filter(l => l.employeeId === u.id || l.empId === u.id);
             },
             getAllLeavesRaw() {
-                if (!this._leaves || this._leaves.length === 0) {
-                    try {
-                        const s = localStorage.getItem('ajTravelsLeaveRequests');
-                        if (s) this._leaves = JSON.parse(s);
-                    } catch (_) { }
-                }
                 return this._leaves || [];
             },
             saveLeave(leave) {
-                this.getAllLeavesRaw();
+                const u = Auth.getUser();
+                const fbUid = window.Firebase?.auth?.currentUser?.uid || u?.id;
+                if (fbUid && !leave.employeeId) leave.employeeId = fbUid;
                 const a = this._leaves || [];
                 const idx = a.findIndex(x => x.id === leave.id);
                 idx >= 0 ? a[idx] = leave : a.push(leave);
@@ -5678,7 +5639,6 @@
                 }
             },
             deleteLeave(id) {
-                this.getAllLeavesRaw();
                 this._leaves = (this._leaves || []).filter(x => x.id !== id);
                 this._writeLeaves(this._leaves);
                 if (typeof FirestoreSync !== 'undefined' && FirestoreSync.deleteDoc) {
@@ -5690,20 +5650,11 @@
             },
 
             _expenses: [],
-            _writeExpenses(a) { this._expenses = a; try { localStorage.setItem('ajTravelsExpenses', JSON.stringify(a)); } catch (_) { } },
+            _writeExpenses(a) { this._expenses = Array.isArray(a) ? a : []; },
             getExpenses() {
-                if (!this._expenses || this._expenses.length === 0) {
-                    const saved = localStorage.getItem('ajTravelsExpenses');
-                    if (saved) {
-                        try { this._expenses = JSON.parse(saved); } catch (_) { }
-                    }
-                    if (!this._expenses || this._expenses.length === 0) {
-                        this._expenses = this.getDefaultExpenses();
-                        this._writeExpenses(this._expenses);
-                    }
-                }
+                if (!Array.isArray(this._expenses)) this._expenses = [];
                 const demoExpIds = ['EXP-101', 'EXP-102', 'EXP-103', 'EXP-104', 'EXP-105', 'EXP-106'];
-                this._expenses = (this._expenses || []).filter(e => !demoExpIds.includes(e.id));
+                this._expenses = this._expenses.filter(e => !demoExpIds.includes(e.id));
                 return this._expenses;
             },
             getDefaultExpenses() {
@@ -5729,18 +5680,17 @@
 
             // Calendar Events Storage
             _calendarEvents: [],
-            _writeCalendarEvents(a) { this._calendarEvents = a || []; try { localStorage.setItem('ajCalendarEvents', JSON.stringify(a)); } catch (_) { } },
+            _writeCalendarEvents(a) { this._calendarEvents = Array.isArray(a) ? a : []; },
             getCalendarEvents() {
-                if (!this._calendarEvents || this._calendarEvents.length === 0) {
-                    const saved = localStorage.getItem('ajCalendarEvents');
-                    if (saved) { try { this._calendarEvents = JSON.parse(saved); } catch (_) { } }
-                    if (!this._calendarEvents) this._calendarEvents = [];
-                }
+                if (!Array.isArray(this._calendarEvents)) this._calendarEvents = [];
                 const demoEvIds = ['EV-101', 'EV-102'];
                 this._calendarEvents = this._calendarEvents.filter(ev => !demoEvIds.includes(ev.id));
                 return this._calendarEvents;
             },
             saveCalendarEvent(ev) {
+                const u = Auth.getUser();
+                const fbUid = window.Firebase?.auth?.currentUser?.uid || u?.id;
+                if (fbUid && !ev.empId) ev.empId = fbUid;
                 const a = this.getCalendarEvents();
                 const idx = a.findIndex(x => x.id === ev.id);
                 idx >= 0 ? a[idx] = ev : a.push(ev);
@@ -5759,24 +5709,19 @@
 
             // Company Holidays Storage
             _holidays: [],
-            _writeHolidays(a) { this._holidays = a || []; try { localStorage.setItem('ajHolidays', JSON.stringify(a)); } catch (_) { } },
+            _writeHolidays(a) { this._holidays = Array.isArray(a) ? a : []; },
             getHolidays() {
-                if (!this._holidays || this._holidays.length === 0) {
-                    const saved = localStorage.getItem('ajHolidays');
-                    if (saved) { try { this._holidays = JSON.parse(saved); } catch (_) { } }
-                    if (!this._holidays || this._holidays.length === 0) {
-                        const curYear = new Date().getFullYear();
-                        this._holidays = [
-                            { id: 'HOL-1', date: `${curYear}-01-01`, name: 'New Year Day', type: 'National', description: 'Public holiday celebration' },
-                            { id: 'HOL-2', date: `${curYear}-01-26`, name: 'Republic Day', type: 'National', description: 'National holiday' },
-                            { id: 'HOL-3', date: `${curYear}-03-25`, name: 'Holi Festival', type: 'Cultural', description: 'Spring festival of colors' },
-                            { id: 'HOL-4', date: `${curYear}-08-15`, name: 'Independence Day', type: 'National', description: 'National independence celebration' },
-                            { id: 'HOL-5', date: `${curYear}-10-02`, name: 'Gandhi Jayanti', type: 'National', description: 'National holiday' },
-                            { id: 'HOL-6', date: `${curYear}-11-01`, name: 'Diwali Festival', type: 'Cultural', description: 'Festival of lights' },
-                            { id: 'HOL-7', date: `${curYear}-12-25`, name: 'Christmas Day', type: 'Public', description: 'Christmas celebration' }
-                        ];
-                        this._writeHolidays(this._holidays);
-                    }
+                if (!Array.isArray(this._holidays) || this._holidays.length === 0) {
+                    const curYear = new Date().getFullYear();
+                    this._holidays = [
+                        { id: 'HOL-1', date: `${curYear}-01-01`, name: 'New Year Day', type: 'National', description: 'Public holiday celebration' },
+                        { id: 'HOL-2', date: `${curYear}-01-26`, name: 'Republic Day', type: 'National', description: 'National holiday' },
+                        { id: 'HOL-3', date: `${curYear}-03-25`, name: 'Holi Festival', type: 'Cultural', description: 'Spring festival of colors' },
+                        { id: 'HOL-4', date: `${curYear}-08-15`, name: 'Independence Day', type: 'National', description: 'National independence celebration' },
+                        { id: 'HOL-5', date: `${curYear}-10-02`, name: 'Gandhi Jayanti', type: 'National', description: 'National holiday' },
+                        { id: 'HOL-6', date: `${curYear}-11-01`, name: 'Diwali Festival', type: 'Cultural', description: 'Festival of lights' },
+                        { id: 'HOL-7', date: `${curYear}-12-25`, name: 'Christmas Day', type: 'Public', description: 'Christmas celebration' }
+                    ];
                 }
                 return this._holidays;
             },
@@ -5801,39 +5746,34 @@
             _companySettings: null,
             getCompanySettings() {
                 if (!this._companySettings) {
-                    const saved = localStorage.getItem('ajCompanySettings');
-                    if (saved) { try { this._companySettings = JSON.parse(saved); } catch (_) { } }
-                    if (!this._companySettings) {
-                        this._companySettings = {
-                            name: 'AJ Tours & Travels',
-                            tagline: 'World Wide Flight & Package Specialists',
-                            phone: '+44 20 7946 0912',
-                            email: 'desk@ajtravels.co.uk',
-                            address: '142 Commercial Road, London E1 1NL, United Kingdom',
-                            website: 'https://ajtravels.co.uk',
-                            taxId: 'GB-VAT-9428105',
-                            currency: 'GBP',
-                            shiftStart: '09:00',
-                            shiftEnd: '17:30',
-                            workingDaysBasis: 26,
-                            graceMinutes: 15,
-                            latePenalty: 150,
-                            earlyPenalty: 100,
-                            halfDayThreshold: 4,
-                            casualLeaves: 12,
-                            sickLeaves: 10,
-                            privilegeLeaves: 15,
-                            autoApproveEmployees: true,
-                            idPrefix: 'AJ-EMP-',
-                            logRetentionDays: 90
-                        };
-                    }
+                    this._companySettings = {
+                        name: 'AJ Tours & Travels',
+                        tagline: 'World Wide Flight & Package Specialists',
+                        phone: '+44 20 7946 0912',
+                        email: 'desk@ajtravels.co.uk',
+                        address: '142 Commercial Road, London E1 1NL, United Kingdom',
+                        website: 'https://ajtravels.co.uk',
+                        taxId: 'GB-VAT-9428105',
+                        currency: 'GBP',
+                        shiftStart: '09:00',
+                        shiftEnd: '17:30',
+                        workingDaysBasis: 26,
+                        graceMinutes: 15,
+                        latePenalty: 150,
+                        earlyPenalty: 100,
+                        halfDayThreshold: 4,
+                        casualLeaves: 12,
+                        sickLeaves: 10,
+                        privilegeLeaves: 15,
+                        autoApproveEmployees: true,
+                        idPrefix: 'AJ-EMP-',
+                        logRetentionDays: 90
+                    };
                 }
                 return this._companySettings;
             },
             saveCompanySettings(s) {
                 this._companySettings = { ...this.getCompanySettings(), ...s };
-                try { localStorage.setItem('ajCompanySettings', JSON.stringify(this._companySettings)); } catch (_) { }
                 FirestoreSync.saveDoc('company_settings', 'main', this._companySettings);
                 Audit.log('update_company_settings', 'main', { name: this._companySettings.name });
             },
@@ -5898,61 +5838,45 @@
                 this.saveCompanySettings({ customPolicyFields: fields });
             },
 
-            // User Settings Storage
+            // User Settings Storage (Firestore-backed, in-memory cache)
             _userSettings: {},
             getUserSettings(uid) {
                 if (!uid) return {};
                 if (!this._userSettings[uid]) {
-                    const saved = localStorage.getItem('ajUserSettings_' + uid);
-                    if (saved) { try { this._userSettings[uid] = JSON.parse(saved); } catch (_) { } }
-                    if (!this._userSettings[uid]) {
-                        this._userSettings[uid] = {
-                            themeColor: '#1677e8',
-                            fontSize: 'medium',
-                            displayMode: 'comfortable',
-                            animations: true,
-                            emailNotifications: true,
-                            pushNotifications: false,
-                            notifyInquiry: true,
-                            notifyBooking: true,
-                            notifyLeave: true,
-                            notifyAttendance: true,
-                            dateFormat: 'DD/MM/YYYY',
-                            timeFormat: '12-hour',
-                            timezone: 'Asia/Kolkata',
-                            salaryVisibility: true,
-                            autoClockoutReminder: true,
-                            defaultShiftStart: '09:00',
-                            defaultShiftEnd: '17:30'
-                        };
-                    }
+                    this._userSettings[uid] = {
+                        themeColor: '#1677e8',
+                        fontSize: 'medium',
+                        displayMode: 'comfortable',
+                        animations: true,
+                        emailNotifications: true,
+                        pushNotifications: false,
+                        notifyInquiry: true,
+                        notifyBooking: true,
+                        notifyLeave: true,
+                        notifyAttendance: true,
+                        dateFormat: 'DD/MM/YYYY',
+                        timeFormat: '12-hour',
+                        timezone: 'Asia/Kolkata',
+                        salaryVisibility: true,
+                        autoClockoutReminder: true,
+                        defaultShiftStart: '09:00',
+                        defaultShiftEnd: '17:30'
+                    };
                 }
                 return this._userSettings[uid];
             },
             saveUserSettings(uid, s) {
                 if (!uid) return;
                 this._userSettings[uid] = { ...this.getUserSettings(uid), ...s };
-                try { localStorage.setItem('ajUserSettings_' + uid, JSON.stringify(this._userSettings[uid])); } catch (_) { }
                 FirestoreSync.saveDoc('user_settings', uid, this._userSettings[uid]);
             },
 
             replaceAll(data) {
-                if (data.inquiries) this._writeInquiries(data.inquiries);
-                if (data.bookings) this._writeBookings(data.bookings);
-                if (data.employees) {
-                    const localEmps = this._ensureEmployees();
-                    const mergedEmps = [...localEmps];
-                    data.employees.forEach(remote => {
-                        const idx = mergedEmps.findIndex(local => local.id === remote.id || (remote.email && local.email && remote.email.toLowerCase() === local.email.toLowerCase()));
-                        if (idx >= 0) {
-                            // Merge fields safely without erasing local attributes like baseSalary, shiftIn, etc.
-                            mergedEmps[idx] = { ...mergedEmps[idx], ...remote };
-                        } else {
-                            mergedEmps.push(remote);
-                        }
-                    });
-                    const demoIds = ['emp_jane_smith', 'emp_john_doe', 'emp_alex_johnson'];
-                    const cleanEmps = mergedEmps.filter(e => !demoIds.includes(e.id));
+                if (Array.isArray(data.inquiries)) this._writeInquiries(data.inquiries);
+                if (Array.isArray(data.bookings)) this._writeBookings(data.bookings);
+                if (Array.isArray(data.employees)) {
+                    const demoIds = ['emp_jane_smith', 'emp_john_doe', 'emp_alex_johnson', 'admin_boss_pgboss07'];
+                    const cleanEmps = data.employees.filter(e => !demoIds.includes(e.id));
                     this._writeEmployees(cleanEmps);
 
                     const curUser = Auth.getUser();
@@ -5963,32 +5887,39 @@
                             if (Auth.isBossAdmin(curUser.email, curUser.role)) {
                                 curUser.role = 'admin';
                             }
+                            if (matching.currencyCode && typeof Currency !== 'undefined' && Currency.syncFromCloud) {
+                                Currency.syncFromCloud(matching.currencyCode);
+                            }
                             try { localStorage.setItem(Auth.USER_KEY, JSON.stringify(curUser)); } catch (_) { }
                         }
                     }
                 }
-                if (data.attendance) this._writeAttendance(data.attendance);
-                if (data.leaves) this._writeLeaves(data.leaves);
-                if (data.expenses) {
+                if (Array.isArray(data.attendance)) this._writeAttendance(data.attendance);
+                if (Array.isArray(data.leaves)) this._writeLeaves(data.leaves);
+                if (Array.isArray(data.expenses)) {
                     const demoExpIds = ['EXP-101', 'EXP-102', 'EXP-103', 'EXP-104', 'EXP-105', 'EXP-106'];
                     this._writeExpenses(data.expenses.filter(e => !demoExpIds.includes(e.id)));
                 }
-                if (data.calendar_events) {
+                if (Array.isArray(data.calendar_events)) {
                     const demoEvIds = ['EV-101', 'EV-102'];
                     this._writeCalendarEvents(data.calendar_events.filter(ev => !demoEvIds.includes(ev.id)));
                 }
-                if (data.holidays) this._writeHolidays(data.holidays);
-                if (data.company_settings && data.company_settings.length) {
+                if (Array.isArray(data.holidays) && data.holidays.length) this._writeHolidays(data.holidays);
+                if (Array.isArray(data.company_settings) && data.company_settings.length) {
                     this._companySettings = data.company_settings[0];
-                    try { localStorage.setItem('ajCompanySettings', JSON.stringify(this._companySettings)); } catch (_) { }
                 }
-                if (data.salary_settings) {
-                    this.getSalarySettings('');
-                    const map = { ...this._salarySettings };
+                if (data.user_settings && data.user_settings.uid) {
+                    this._userSettings[data.user_settings.uid] = { ...this.getUserSettings(data.user_settings.uid), ...data.user_settings.data };
+                }
+                if (Array.isArray(data.salary_settings)) {
+                    const map = {};
                     data.salary_settings.forEach(s => {
-                        map[s.id] = { ...(map[s.id] || {}), ...s };
+                        map[s.id] = s;
                     });
                     this._writeSalarySettings(map);
+                }
+                if (Array.isArray(data.audit_logs) && typeof Audit !== 'undefined') {
+                    Audit._logs = data.audit_logs.sort((a, b) => String(b.timestamp || '').localeCompare(String(a.timestamp || '')));
                 }
             }
         };
@@ -5998,32 +5929,54 @@
             dbAvailable: true,
             isBlocked: false,
             _syncTimer: null,
+            _listenersAttached: false,
+            _inFlightFetch: null,
 
             async init() {
                 if (!window.Firebase?.db) return;
+                this.enabled = true;
                 this.dbAvailable = true;
                 // Hydrate data directly from Cloud Firestore (database: default)
-                this.fetchInitialData().catch(() => { });
-                // Set up periodic cloud sync every 60 seconds
+                await this.fetchInitialData().catch(() => { });
+                // Periodic cloud sync every 15 seconds across all devices
                 if (!this._syncTimer) {
                     this._syncTimer = setInterval(() => {
-                        if (Auth.isAuthenticated()) {
+                        if (Auth.isAuthenticated() && window.Firebase?.auth?.currentUser) {
                             this.fetchInitialData().catch(() => { });
                         }
-                    }, 60000);
+                    }, 15000);
+                }
+                // Immediate sync when switching back to browser tab / mobile app
+                if (!this._listenersAttached) {
+                    this._listenersAttached = true;
+                    const syncNow = () => {
+                        if (Auth.isAuthenticated() && window.Firebase?.auth?.currentUser && !document.hidden) {
+                            this.fetchInitialData().catch(() => { });
+                        }
+                    };
+                    window.addEventListener('focus', syncNow);
+                    document.addEventListener('visibilitychange', syncNow);
                 }
             },
 
-            async fetchInitialData() {
+            fetchInitialData() {
+                if (this._inFlightFetch) return this._inFlightFetch;
+                this._inFlightFetch = this._runFetchInitialData().finally(() => {
+                    this._inFlightFetch = null;
+                });
+                return this._inFlightFetch;
+            },
+
+            async _runFetchInitialData() {
                 const F = window.Firebase;
-                if (!F?.db || !Auth.isAuthenticated()) return;
+                if (!F?.db || !Auth.isAuthenticated() || !F.auth?.currentUser?.uid) return;
                 const u = Auth.getUser();
-                const fbUid = F.auth?.currentUser?.uid || u?.id;
+                const fbUid = F.auth.currentUser.uid;
                 if (!u || !fbUid) return;
 
                 try {
                     const updatePayload = {};
-                    const isAdmin = u.role === 'admin';
+                    const isAdmin = u.role === 'admin' || Auth.isAdminEmail(F.auth.currentUser.email);
 
                     if (isAdmin) {
                         const cols = [
@@ -6036,33 +5989,44 @@
                             { col: 'leave_requests', key: 'leaves' },
                             { col: 'calendar_events', key: 'calendar_events' },
                             { col: 'holidays', key: 'holidays' },
-                            { col: 'company_settings', key: 'company_settings' }
+                            { col: 'company_settings', key: 'company_settings' },
+                            { col: 'audit_logs', key: 'audit_logs' }
                         ];
 
-                        const results = await Promise.allSettled(cols.map(item =>
-                            F.getDocs(F.collection(F.db, item.col)).then(snap => {
-                                if (snap && !snap.empty) {
-                                    return { key: item.key, data: snap.docs.map(d => ({ id: d.id, ...d.data() })) };
-                                }
-                                return null;
-                            })
-                        ));
+                        const [results, userSettingsRes] = await Promise.all([
+                            Promise.allSettled(cols.map(item =>
+                                F.getDocs(F.collection(F.db, item.col)).then(snap => ({
+                                    key: item.key,
+                                    data: snap ? snap.docs.map(d => ({ id: d.id, ...d.data() })) : []
+                                }))
+                            )),
+                            F.getDoc(F.doc(F.db, 'user_settings', fbUid)).catch(() => null)
+                        ]);
 
-                        results.forEach(res => {
-                            if (res.status === 'fulfilled' && res.value && res.value.data) {
+                        results.forEach((res, idx) => {
+                            if (res.status === 'fulfilled' && res.value) {
                                 updatePayload[res.value.key] = res.value.data;
+                            } else if (res.status === 'rejected') {
+                                console.warn('Firestore fetch failed for', cols[idx].col, res.reason);
                             }
                         });
+                        if (userSettingsRes && userSettingsRes.exists()) {
+                            updatePayload.user_settings = { uid: fbUid, data: userSettingsRes.data() };
+                        }
                     } else {
                         // Active employee: strictly scoped Firestore queries matching server-side firestore.rules
                         const mergeSnaps = (snaps) => {
                             const map = new Map();
+                            let anySuccess = false;
                             snaps.forEach(r => {
-                                if (r.status === 'fulfilled' && r.value && !r.value.empty) {
-                                    r.value.docs.forEach(d => map.set(d.id, { id: d.id, ...d.data() }));
+                                if (r.status === 'fulfilled' && r.value) {
+                                    anySuccess = true;
+                                    if (!r.value.empty) {
+                                        r.value.docs.forEach(d => map.set(d.id, { id: d.id, ...d.data() }));
+                                    }
                                 }
                             });
-                            return Array.from(map.values());
+                            return anySuccess ? Array.from(map.values()) : null;
                         };
 
                         const [
@@ -6072,6 +6036,7 @@
                             leaveRes,
                             userDocRes,
                             salDocRes,
+                            userSetRes,
                             calRes,
                             holRes,
                             compRes
@@ -6086,33 +6051,46 @@
                                 F.getDocs(F.query(F.collection(F.db, 'bookings'), F.where('assignedTo', '==', fbUid))),
                                 F.getDocs(F.query(F.collection(F.db, 'bookings'), F.where('createdBy', '==', fbUid)))
                             ]),
-                            F.getDocs(F.query(F.collection(F.db, 'attendance'), F.where('employeeId', '==', fbUid))).catch(() => null),
-                            F.getDocs(F.query(F.collection(F.db, 'leave_requests'), F.where('employeeId', '==', fbUid))).catch(() => null),
+                            Promise.allSettled([
+                                F.getDocs(F.query(F.collection(F.db, 'attendance'), F.where('employeeId', '==', fbUid))),
+                                F.getDocs(F.query(F.collection(F.db, 'attendance'), F.where('empId', '==', fbUid)))
+                            ]),
+                            Promise.allSettled([
+                                F.getDocs(F.query(F.collection(F.db, 'leave_requests'), F.where('employeeId', '==', fbUid))),
+                                F.getDocs(F.query(F.collection(F.db, 'leave_requests'), F.where('empId', '==', fbUid)))
+                            ]),
                             F.getDoc(F.doc(F.db, 'users', fbUid)).catch(() => null),
                             F.getDoc(F.doc(F.db, 'salary_settings', fbUid)).catch(() => null),
+                            F.getDoc(F.doc(F.db, 'user_settings', fbUid)).catch(() => null),
                             F.getDocs(F.collection(F.db, 'calendar_events')).catch(() => null),
                             F.getDocs(F.collection(F.db, 'holidays')).catch(() => null),
                             F.getDocs(F.collection(F.db, 'company_settings')).catch(() => null)
                         ]);
 
                         const inqs = mergeSnaps(inqRes);
-                        if (inqs.length) updatePayload.inquiries = inqs;
+                        if (inqs !== null) updatePayload.inquiries = inqs;
                         const bks = mergeSnaps(bkRes);
-                        if (bks.length) updatePayload.bookings = bks;
-                        if (attRes && !attRes.empty) updatePayload.attendance = attRes.docs.map(d => ({ id: d.id, ...d.data() }));
-                        if (leaveRes && !leaveRes.empty) updatePayload.leaves = leaveRes.docs.map(d => ({ id: d.id, ...d.data() }));
+                        if (bks !== null) updatePayload.bookings = bks;
+                        const atts = mergeSnaps(attRes);
+                        if (atts !== null) updatePayload.attendance = atts;
+                        const lvs = mergeSnaps(leaveRes);
+                        if (lvs !== null) updatePayload.leaves = lvs;
                         if (userDocRes && userDocRes.exists()) updatePayload.employees = [{ id: userDocRes.id, ...userDocRes.data() }];
                         if (salDocRes && salDocRes.exists()) updatePayload.salary_settings = [{ id: salDocRes.id, ...salDocRes.data() }];
-                        if (calRes && !calRes.empty) updatePayload.calendar_events = calRes.docs.map(d => ({ id: d.id, ...d.data() }));
-                        if (holRes && !holRes.empty) updatePayload.holidays = holRes.docs.map(d => ({ id: d.id, ...d.data() }));
-                        if (compRes && !compRes.empty) updatePayload.company_settings = compRes.docs.map(d => ({ id: d.id, ...d.data() }));
+                        if (userSetRes && userSetRes.exists()) updatePayload.user_settings = { uid: fbUid, data: userSetRes.data() };
+                        if (calRes) updatePayload.calendar_events = calRes.docs.map(d => ({ id: d.id, ...d.data() }));
+                        if (holRes) updatePayload.holidays = holRes.docs.map(d => ({ id: d.id, ...d.data() }));
+                        if (compRes) updatePayload.company_settings = compRes.docs.map(d => ({ id: d.id, ...d.data() }));
                     }
 
                     if (Object.keys(updatePayload).length > 0) {
+                        Storage.clearLegacyLocalKeys();
                         Storage.replaceAll(updatePayload);
                         window.dispatchEvent(new CustomEvent('storage-synced', { detail: updatePayload }));
                     }
-                } catch (_) { }
+                } catch (e) {
+                    console.warn('Firestore fetchInitialData error:', e);
+                }
             },
 
             listenAll() {
@@ -6127,24 +6105,43 @@
             },
 
             async saveDoc(col, id, data) {
-                if (!this.enabled || !window.Firebase?.db) return;
+                if (!this.enabled || !window.Firebase?.db) return false;
+                const F = window.Firebase;
+                if (!F.auth?.currentUser) {
+                    Utils.showToast('Session Expired', 'Please sign in again so this entry saves to Cloud Firestore.', 'error');
+                    return false;
+                }
                 try {
-                    const F = window.Firebase;
                     const clean = JSON.parse(JSON.stringify(data));
                     clean.updatedAt = clean.updatedAt || new Date().toISOString();
+                    const payloadBytes = new Blob([JSON.stringify(clean)]).size;
+                    if (payloadBytes > 980000) {
+                        Utils.showToast('Cloud Save Error', 'Record + attachments exceed Firestore 1 MB limit. Please upload smaller files.', 'error');
+                        return false;
+                    }
                     await F.setDoc(F.doc(F.db, col, String(id)), clean, { merge: true });
+                    return true;
                 } catch (e) {
-                    // Fail gracefully into local storage
+                    console.error('Firestore saveDoc failed:', col, id, e);
+                    const msg = e?.code === 'permission-denied'
+                        ? 'Cloud permission denied. Ensure your account is active/approved and signed in.'
+                        : (e?.message || 'Could not sync to Firestore.');
+                    Utils.showToast('Cloud Sync Error', msg, 'error');
+                    return false;
                 }
             },
 
             async deleteDoc(col, id) {
-                if (!this.enabled || !window.Firebase?.db) return;
+                if (!this.enabled || !window.Firebase?.db) return false;
+                const F = window.Firebase;
+                if (!F.auth?.currentUser) return false;
                 try {
-                    const F = window.Firebase;
                     await F.deleteDoc(F.doc(F.db, col, String(id)));
+                    return true;
                 } catch (e) {
-                    // Fail gracefully
+                    console.error('Firestore deleteDoc failed:', col, id, e);
+                    Utils.showToast('Cloud Delete Error', e?.message || 'Could not delete from Firestore.', 'error');
+                    return false;
                 }
             },
 
@@ -6365,9 +6362,11 @@
                             }
                         }
 
+                        Storage.clearAllLocalData();
+                        FirestoreSync.enabled = true;
                         this.setUser({ id: cred.user.uid, name, email: cred.user.email, contact, role, rank, source: 'firebase' });
-                        // Background sync - does not block login navigation
-                        FirestoreSync.init().catch(() => { });
+                        // Wait for initial Firestore hydration so all cloud data renders right away
+                        await FirestoreSync.init().catch(() => { });
                         return { success: true };
                     } catch (fbErr) {
                         const code = fbErr?.code || '';
@@ -6479,11 +6478,12 @@
                     FirestoreSync.stop();
                     FirestoreSync.enabled = false;
                 } catch (_) { }
-                if (window.Firebase?.auth && Auth.firebaseUser) {
+                if (window.Firebase?.auth) {
                     try { await window.Firebase.signOut(window.Firebase.auth); } catch (_) { }
                 }
                 this.firebaseUser = null;
                 this.setUser(null);
+                Storage.clearAllLocalData();
             },
             isAuthenticated() { return this.currentUser !== null; }
         };
@@ -6798,11 +6798,11 @@
                 return allowed.test(trimmed) ? trimmed : '#';
             },
             validateUploadFile(file) {
-                const maxBytes = 750 * 1024; // 750 KB safe ceiling for Firestore 1MB doc limit
+                const maxBytes = 500 * 1024; // 500 KB raw (~667 KB base64) safe ceiling for Firestore 1 MiB doc limit
                 const allowedExt = /\.(pdf|png|jpe?g|webp|doc|docx|xls|xlsx|txt)$/i;
                 const blockedMime = /(html|svg|javascript|ecmascript|x-msdownload|x-sh)/i;
                 if (!file) return 'Invalid file';
-                if (file.size > maxBytes) return `${file.name} exceeds 750 KB limit.`;
+                if (file.size > maxBytes) return `${file.name} exceeds 500 KB limit for cloud storage.`;
                 if (!allowedExt.test(file.name) || blockedMime.test(file.type || '')) {
                     return `${file.name} has an unsupported file type. Allowed: PDF, PNG, JPG, WEBP, DOC/X, XLS/X, TXT.`;
                 }
@@ -16921,6 +16921,7 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             Theme.init();
+            Storage.clearLegacyLocalKeys();
             Auth.init();
             Router.navigate(Auth.isAuthenticated() ? (window.location.hash.slice(1) || 'dashboard') : 'login');
             window.addEventListener('hashchange', () => Router.navigate(window.location.hash.slice(1) || 'dashboard'));
@@ -16930,19 +16931,63 @@
             });
         });
         window.addEventListener('firebase-ready', () => {
-            if (window.Firebase?.auth) {
-                // Always register auth state listener to automatically sync with Firestore across any device
-                window.Firebase.onAuthStateChanged(window.Firebase.auth, (user) => {
-                    if (user) {
-                        Auth.firebaseUser = user;
-                        FirestoreSync.init();
+            const F = window.Firebase;
+            if (F?.auth) {
+                // Verify real Firebase Auth session and sync all data with Firestore across devices
+                F.onAuthStateChanged(F.auth, async (fbUser) => {
+                    if (fbUser) {
+                        Auth.firebaseUser = fbUser;
+                        const resolvedEmailAdmin = Auth.isAdminEmail(fbUser.email);
+                        let role = resolvedEmailAdmin ? 'admin' : 'employee';
+                        let name = fbUser.displayName || fbUser.email;
+                        let contact = '';
+                        let rank = role === 'admin' ? 'Managing Director / Boss' : 'Travel Consultant';
+
+                        try {
+                            const prof = await F.getDoc(F.doc(F.db, 'users', fbUser.uid));
+                            if (prof.exists()) {
+                                const p = prof.data();
+                                name = p.fullName || p.name || name;
+                                if (p.role === 'admin' || resolvedEmailAdmin) role = 'admin';
+                                contact = p.contact || p.phone || '';
+                                rank = p.rank || rank;
+                                const userStatus = p.status || (role === 'admin' ? 'active' : 'pending');
+                                if (!resolvedEmailAdmin && (userStatus === 'pending' || userStatus === 'disabled' || userStatus === 'trash')) {
+                                    await Auth.logout();
+                                    Router.navigate('login');
+                                    return;
+                                }
+                                if (p.currencyCode && typeof Currency !== 'undefined' && Currency.syncFromCloud) {
+                                    Currency.syncFromCloud(p.currencyCode);
+                                }
+                            }
+                        } catch (_) { }
+
+                        Auth.setUser({ id: fbUser.uid, name, email: fbUser.email, contact, role, rank, source: 'firebase' });
+                        FirestoreSync.enabled = true;
+                        await FirestoreSync.init();
+                        const cur = window.location.hash.slice(1) || 'dashboard';
+                        if (!document.querySelector('.modal-overlay')) {
+                            Router.navigate(['login', 'signup'].includes(cur) ? 'dashboard' : cur);
+                        }
+                    } else {
+                        // No active Firebase Auth user: clear stale local session so PC & Mobile stay strictly Firestore-backed
+                        Auth.firebaseUser = null;
+                        Auth.setUser(null);
+                        Storage.clearAllLocalData();
+                        FirestoreSync.stop();
+                        const cur = window.location.hash.slice(1) || 'login';
+                        if (!['login', 'signup'].includes(cur)) {
+                            Router.navigate('login');
+                        }
                     }
                 });
             }
         });
         window.addEventListener('storage-synced', () => {
+            if (document.querySelector('.modal-overlay')) return;
             const cur = window.location.hash.slice(1) || 'dashboard';
-            if (['dashboard', 'employees', 'attendance', 'inquiries', 'bookings', 'reports'].includes(cur)) {
+            if (['dashboard', 'employees', 'attendance', 'inquiries', 'my-bookings', 'expenses', 'calendar', 'details', 'reports', 'audit-logs', 'settings'].includes(cur)) {
                 Router.navigate(cur);
             }
         });
